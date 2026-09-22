@@ -26,4 +26,6 @@ var (
 
 	ErrEventStreamNotFound = errors.New("event stream not found for aggregate")
 	ErrConcurrencyConflict = errors.New("concurrency conflict: aggregate was modified by another operation")
+
+	ErrUnknownEventType = errors.New("event: unknown event type")
 )
