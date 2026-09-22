@@ -10,4 +10,20 @@ var (
 	ErrInvalidAssignee    = errors.New("invalid assignee: assignee cannot be empty")
 	ErrInvalidID          = errors.New("invalid ID: ID cannot be empty")
 	ErrInvalidUUID        = errors.New("invalid UUID: UUID cannot be empty")
+
+	ErrTicketAlreadyClosed     = errors.New("invalid operation: ticket is already closed")
+	ErrInvalidStatusTransition = errors.New("invalid status transition")
+
+	ErrInvalidContent  = errors.New("invalid content: content cannot be empty")
+	ErrInvalidAuthorID = errors.New("invalid author: author cannot be empty")
+	ErrInvalidTicketID = errors.New("invalid ticket ID: ticket ID cannot be empty")
+
+	ErrInvalidResponse        = errors.New("invalid response: response cannot be nil")
+	ErrResponseTicketMismatch = errors.New("invalid response: response does not belong to this ticket")
+
+	ErrEmptyEventHistory   = errors.New("invalid history: event history cannot be empty")
+	ErrInvalidEventHistory = errors.New("invalid history: first event must be TicketOpened")
+
+	ErrEventStreamNotFound = errors.New("event stream not found for aggregate")
+	ErrConcurrencyConflict = errors.New("concurrency conflict: aggregate was modified by another operation")
 )
