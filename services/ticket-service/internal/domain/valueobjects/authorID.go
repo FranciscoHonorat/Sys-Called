@@ -1,8 +1,6 @@
 package valueobjects
 
 import (
-	"encoding/json"
-
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 )
 
@@ -11,11 +9,11 @@ type AuthorID struct {
 }
 
 func NewAuthorID(id string) (AuthorID, error) {
-	author := AuthorID{id: id}
-	if !author.IsValid() {
-		return AuthorID{}, domainErr.ErrInvalidAuthorID
+	value, err := newNonEmptyString(id, domainErr.ErrInvalidAuthorID)
+	if err != nil {
+		return AuthorID{}, err
 	}
-	return author, nil
+	return AuthorID{id: value}, nil
 }
 
 func (a AuthorID) GetAuthorID() string {
@@ -31,18 +29,14 @@ func (a AuthorID) Equals(other AuthorID) bool {
 }
 
 func (a AuthorID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(a.id)
+	return marshalNonEmptyString(a.id)
 }
 
 func (a *AuthorID) UnmarshalJSON(data []byte) error {
-	var id string
-	if err := json.Unmarshal(data, &id); err != nil {
+	value, err := unmarshalNonEmptyString(data, domainErr.ErrInvalidAuthorID)
+	if err != nil {
 		return err
 	}
-	author := AuthorID{id: id}
-	if !author.IsValid() {
-		return domainErr.ErrInvalidAuthorID
-	}
-	*a = author
+	a.id = value
 	return nil
 }

@@ -1,8 +1,6 @@
 package valueobjects
 
 import (
-	"encoding/json"
-
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 )
 
@@ -11,11 +9,11 @@ type Title struct {
 }
 
 func NewTitle(title string) (*Title, error) {
-	t := &Title{Title: title}
-	if !t.IsValid() {
-		return nil, domainErr.ErrInvalidTitle
+	value, err := newNonEmptyString(title, domainErr.ErrInvalidTitle)
+	if err != nil {
+		return nil, err
 	}
-	return t, nil
+	return &Title{Title: value}, nil
 }
 
 func (t *Title) GetTitle() string {
@@ -23,7 +21,7 @@ func (t *Title) GetTitle() string {
 }
 
 func (t *Title) IsValid() bool {
-	return len(t.Title) > 0
+	return t.Title != ""
 }
 
 func (t *Title) Equals(other *Title) bool {
@@ -34,24 +32,14 @@ func (t *Title) Equals(other *Title) bool {
 }
 
 func (t *Title) MarshalJSON() ([]byte, error) {
-	type Alias Title
-	return json.Marshal(&struct {
-		*Alias
-	}{
-		Alias: (*Alias)(t),
-	})
+	return marshalNonEmptyString(t.Title)
 }
 
 func (t *Title) UnmarshalJSON(data []byte) error {
-	type Alias Title
-	aux := &struct {
-		*Alias
-	}{
-		Alias: (*Alias)(t),
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
+	value, err := unmarshalNonEmptyString(data, domainErr.ErrInvalidTitle)
+	if err != nil {
 		return err
 	}
-	t.Title = aux.Title
+	t.Title = value
 	return nil
 }

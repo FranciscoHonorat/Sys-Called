@@ -23,12 +23,7 @@ func NewPriority(priority string) (Priority, error) {
 }
 
 func (p Priority) IsValid() bool {
-	switch p {
-	case TicketPriorityLow, TicketPriorityMedium, TicketPriorityHigh:
-		return true
-	default:
-		return false
-	}
+	return isOneOf(p, TicketPriorityLow, TicketPriorityMedium, TicketPriorityHigh)
 }
 
 func (p Priority) Equals(other Priority) bool {

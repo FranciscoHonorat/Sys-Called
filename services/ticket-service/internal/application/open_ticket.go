@@ -22,12 +22,11 @@ type OpenTicketOutput struct {
 }
 
 type OpenTicketUseCase struct {
-	store repository.EventStore
-	cache repository.TicketCache
+	eventSourcedUseCase
 }
 
 func NewOpenTicketUseCase(store repository.EventStore, cache repository.TicketCache) *OpenTicketUseCase {
-	return &OpenTicketUseCase{store: store, cache: cache}
+	return &OpenTicketUseCase{eventSourcedUseCase{store: store, cache: cache}}
 }
 
 func (uc *OpenTicketUseCase) Execute(ctx context.Context, input OpenTicketInput) (OpenTicketOutput, error) {
@@ -66,11 +65,9 @@ func (uc *OpenTicketUseCase) Execute(ctx context.Context, input OpenTicketInput)
 		return OpenTicketOutput{}, err
 	}
 
-	if err := uc.store.Append(ctx, t.GetID().GetID(), t.GetUncommittedEvents(), 0); err != nil {
+	if err := uc.commit(ctx, t, t.GetID().GetID(), 0); err != nil {
 		return OpenTicketOutput{}, err
 	}
-	t.ClearUncommittedEvents()
-	uc.cache.Set(ctx, t)
 
 	return OpenTicketOutput{TicketID: t.GetID().String()}, nil
 }

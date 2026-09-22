@@ -34,12 +34,11 @@ type GetTicketOutput struct {
 }
 
 type GetTicketUseCase struct {
-	store repository.EventStore
-	cache repository.TicketCache
+	eventSourcedUseCase
 }
 
 func NewGetTicketUseCase(store repository.EventStore, cache repository.TicketCache) *GetTicketUseCase {
-	return &GetTicketUseCase{store: store, cache: cache}
+	return &GetTicketUseCase{eventSourcedUseCase{store: store, cache: cache}}
 }
 
 func (uc *GetTicketUseCase) Execute(ctx context.Context, input GetTicketInput) (GetTicketOutput, error) {
@@ -52,12 +51,7 @@ func (uc *GetTicketUseCase) Execute(ctx context.Context, input GetTicketInput) (
 		return toGetTicketOutput(t), nil
 	}
 
-	history, err := uc.store.Load(ctx, ticketID)
-	if err != nil {
-		return GetTicketOutput{}, err
-	}
-
-	t, err := ticket.LoadFromHistory(history)
+	t, _, err := uc.loadTicket(ctx, ticketID)
 	if err != nil {
 		return GetTicketOutput{}, err
 	}
