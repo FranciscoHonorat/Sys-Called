@@ -23,4 +23,7 @@ var (
 
 	ErrEmptyEventHistory   = errors.New("invalid history: event history cannot be empty")
 	ErrInvalidEventHistory = errors.New("invalid history: first event must be TicketOpened")
+
+	ErrEventStreamNotFound = errors.New("event stream not found for aggregate")
+	ErrConcurrencyConflict = errors.New("concurrency conflict: aggregate was modified by another operation")
 )
