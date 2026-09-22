@@ -1,4 +1,4 @@
-MODULES := ./services/ticket-service/... ./services/employees-service/... ./shared/...
+MODULES := ./services/ticket-service ./services/employees-service ./shared
 DOCKER_COMPOSE=docker compose
 
 .PHONY: help build run test test-integration fmt tidy docker-build docker-build-inventory docker-build-cdc docker-build-user docker-up docker-down
@@ -16,12 +16,17 @@ help:
 
 build:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/ticket-service ./services/ticket-service/cmd/server
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/employees-service ./services/employees-service/cmd/server
 
 run:
 	go run ./$(SERVICE)/cmd/server
 
 test:
 	@for m in $(MODULES); do \
+		if [ -z "$$(find $$m -name '*.go' -print -quit)" ]; then \
+			echo "==> skipping $$m (no Go files yet)"; \
+			continue; \
+		fi; \
 		echo "==> go test ./... ($$m)"; \
 		(cd $$m && go test ./...) || exit 1; \
 	done
