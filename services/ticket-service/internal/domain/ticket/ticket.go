@@ -5,6 +5,7 @@ import (
 	"time"
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/response"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 	"github.com/google/uuid"
 )
@@ -17,6 +18,7 @@ type Ticket struct {
 	assigneeID  *valueobjects.AssigneeID
 	priority    *valueobjects.Priority
 	createdAt   time.Time
+	responses   []*response.Response
 }
 
 func NewTicket(id *valueobjects.ID, title *valueobjects.Title, description *valueobjects.Description, status valueobjects.Status, assigneeID *valueobjects.AssigneeID, priority *valueobjects.Priority) (*Ticket, error) {
@@ -72,6 +74,24 @@ func (t *Ticket) GetCreatedAt() time.Time {
 	return t.createdAt
 }
 
+func (t *Ticket) GetResponses() []*response.Response {
+	return t.responses
+}
+
+func (t *Ticket) AddResponse(r *response.Response) error {
+	if t.status == valueobjects.TicketStatusClosed {
+		return domainErr.ErrTicketAlreadyClosed
+	}
+	if r == nil {
+		return domainErr.ErrInvalidResponse
+	}
+	if !r.GetTicketID().Equals(t.id) {
+		return domainErr.ErrResponseTicketMismatch
+	}
+	t.responses = append(t.responses, r)
+	return nil
+}
+
 func (t *Ticket) AssignTo(assigneeID *valueobjects.AssigneeID) error {
 	if t.status == valueobjects.TicketStatusClosed {
 		return domainErr.ErrTicketAlreadyClosed
@@ -112,19 +132,21 @@ func (t *Ticket) Close() error {
 
 func (t *Ticket) MarshalJSON() ([]byte, error) {
 	aux := struct {
-		ID          string `json:"id"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Status      string `json:"status"`
-		AssigneeID  string `json:"assignee_id,omitempty"`
-		Priority    string `json:"priority,omitempty"`
-		CreatedAt   string `json:"created_at"`
+		ID          string               `json:"id"`
+		Title       string               `json:"title"`
+		Description string               `json:"description"`
+		Status      string               `json:"status"`
+		AssigneeID  string               `json:"assignee_id,omitempty"`
+		Priority    string               `json:"priority,omitempty"`
+		CreatedAt   string               `json:"created_at"`
+		Responses   []*response.Response `json:"responses,omitempty"`
 	}{
 		ID:          t.id.String(),
 		Title:       t.title.GetTitle(),
 		Description: t.description.GetDescription(),
 		Status:      t.status.String(),
 		CreatedAt:   t.createdAt.Format(time.RFC3339),
+		Responses:   t.responses,
 	}
 
 	if t.assigneeID != nil {
@@ -139,13 +161,14 @@ func (t *Ticket) MarshalJSON() ([]byte, error) {
 
 func (t *Ticket) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		ID          string `json:"id"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Status      string `json:"status"`
-		AssigneeID  string `json:"assignee_id"`
-		Priority    string `json:"priority"`
-		CreatedAt   string `json:"created_at"`
+		ID          string               `json:"id"`
+		Title       string               `json:"title"`
+		Description string               `json:"description"`
+		Status      string               `json:"status"`
+		AssigneeID  string               `json:"assignee_id"`
+		Priority    string               `json:"priority"`
+		CreatedAt   string               `json:"created_at"`
+		Responses   []*response.Response `json:"responses"`
 	}{}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -203,6 +226,13 @@ func (t *Ticket) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	t.createdAt = createdAt
+
+	for _, r := range aux.Responses {
+		if r == nil || !r.GetTicketID().Equals(t.id) {
+			return domainErr.ErrResponseTicketMismatch
+		}
+	}
+	t.responses = aux.Responses
 
 	return nil
 }

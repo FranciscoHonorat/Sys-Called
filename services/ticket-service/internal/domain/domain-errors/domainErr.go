@@ -13,4 +13,11 @@ var (
 
 	ErrTicketAlreadyClosed     = errors.New("invalid operation: ticket is already closed")
 	ErrInvalidStatusTransition = errors.New("invalid status transition")
+
+	ErrInvalidContent  = errors.New("invalid content: content cannot be empty")
+	ErrInvalidAuthorID = errors.New("invalid author: author cannot be empty")
+	ErrInvalidTicketID = errors.New("invalid ticket ID: ticket ID cannot be empty")
+
+	ErrInvalidResponse        = errors.New("invalid response: response cannot be nil")
+	ErrResponseTicketMismatch = errors.New("invalid response: response does not belong to this ticket")
 )

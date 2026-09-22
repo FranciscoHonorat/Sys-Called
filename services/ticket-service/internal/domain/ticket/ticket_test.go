@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/response"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 
@@ -33,6 +34,21 @@ func validTicketParts(t *testing.T) (*valueobjects.ID, *valueobjects.Title, *val
 	assert.NoError(t, err)
 
 	return id, title, description, status, &assignee, &priority
+}
+
+func validResponseFor(t *testing.T, ticketID *valueobjects.ID) *response.Response {
+	t.Helper()
+
+	author, err := valueobjects.NewAuthorID("agent-1")
+	assert.NoError(t, err)
+
+	content, err := valueobjects.NewContent("Valid response content")
+	assert.NoError(t, err)
+
+	r, err := response.NewResponse(valueobjects.NewID(uuid.Nil), ticketID, &author, content)
+	assert.NoError(t, err)
+
+	return r
 }
 
 func TestTicket(t *testing.T) {
@@ -110,7 +126,19 @@ func TestTicket(t *testing.T) {
 		assert.Contains(t, string(data), `"assignee_id":"agent-1"`)
 	})
 
-	t.Run("should omit assignee and priority when absent", func(t *testing.T) {
+	t.Run("should include responses in the marshaled JSON", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.AddResponse(validResponseFor(t, tk.GetID())))
+
+		data, err := tk.MarshalJSON()
+
+		assert.NoError(t, err)
+		assert.Contains(t, string(data), `"content":"Valid response content"`)
+	})
+
+	t.Run("should omit assignee, priority and responses when absent", func(t *testing.T) {
 		id, title, description, status, _, _ := validTicketParts(t)
 		tk, err := ticket.NewTicket(id, title, description, status, nil, nil)
 		assert.NoError(t, err)
@@ -120,12 +148,14 @@ func TestTicket(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotContains(t, string(data), `"assignee_id"`)
 		assert.NotContains(t, string(data), `"priority"`)
+		assert.NotContains(t, string(data), `"responses"`)
 	})
 
 	t.Run("should round-trip marshal and unmarshal", func(t *testing.T) {
 		id, title, description, status, assignee, priority := validTicketParts(t)
 		original, err := ticket.NewTicket(id, title, description, status, assignee, priority)
 		assert.NoError(t, err)
+		assert.NoError(t, original.AddResponse(validResponseFor(t, original.GetID())))
 
 		data, err := original.MarshalJSON()
 		assert.NoError(t, err)
@@ -140,6 +170,8 @@ func TestTicket(t *testing.T) {
 		assert.Equal(t, original.GetStatus(), decoded.GetStatus())
 		assert.Equal(t, original.GetAssigneeID().GetAssigneeID(), decoded.GetAssigneeID().GetAssigneeID())
 		assert.Equal(t, original.GetPriority().GetPriority(), decoded.GetPriority().GetPriority())
+		assert.Len(t, decoded.GetResponses(), 1)
+		assert.Equal(t, original.GetResponses()[0].GetContent().GetContent(), decoded.GetResponses()[0].GetContent().GetContent())
 	})
 
 	t.Run("should leave assignee and priority nil when absent from JSON", func(t *testing.T) {
@@ -187,6 +219,18 @@ func TestTicket(t *testing.T) {
 		err := tk.UnmarshalJSON(data)
 
 		assert.Error(t, err)
+	})
+
+	t.Run("should return an error when unmarshaling a response for a different ticket", func(t *testing.T) {
+		ticketID := uuid.New()
+		otherTicketID := uuid.New()
+		data := []byte(`{"id":"` + ticketID.String() + `","title":"T","description":"D","status":"Open","created_at":"` + time.Now().Format(time.RFC3339) +
+			`","responses":[{"id":"` + uuid.New().String() + `","ticket_id":"` + otherTicketID.String() + `","author_id":"agent-1","content":"C","created_at":"` + time.Now().Format(time.RFC3339) + `"}]}`)
+
+		var tk ticket.Ticket
+		err := tk.UnmarshalJSON(data)
+
+		assert.ErrorIs(t, err, domainErr.ErrResponseTicketMismatch)
 	})
 
 	t.Run("should assign a Ticket to a new assignee", func(t *testing.T) {
@@ -311,6 +355,55 @@ func TestTicket(t *testing.T) {
 		assert.NoError(t, tk.Close())
 
 		err = tk.Close()
+
+		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
+	})
+
+	t.Run("should add a response to a Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		r := validResponseFor(t, tk.GetID())
+
+		err = tk.AddResponse(r)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []*response.Response{r}, tk.GetResponses())
+	})
+
+	t.Run("should return an error when adding a nil response", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		err = tk.AddResponse(nil)
+
+		assert.ErrorIs(t, err, domainErr.ErrInvalidResponse)
+	})
+
+	t.Run("should return an error when the response belongs to a different Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		otherTicketID := valueobjects.NewID(uuid.New())
+		r := validResponseFor(t, otherTicketID)
+
+		err = tk.AddResponse(r)
+
+		assert.ErrorIs(t, err, domainErr.ErrResponseTicketMismatch)
+	})
+
+	t.Run("should return an error when adding a response to a closed Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.Close())
+
+		r := validResponseFor(t, tk.GetID())
+
+		err = tk.AddResponse(r)
 
 		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
 	})
