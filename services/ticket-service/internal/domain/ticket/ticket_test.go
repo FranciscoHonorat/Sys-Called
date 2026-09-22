@@ -188,4 +188,130 @@ func TestTicket(t *testing.T) {
 
 		assert.Error(t, err)
 	})
+
+	t.Run("should assign a Ticket to a new assignee", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		newAssignee, err := valueobjects.NewAssigneeID("agent-2")
+		assert.NoError(t, err)
+
+		err = tk.AssignTo(&newAssignee)
+
+		assert.NoError(t, err)
+		assert.Equal(t, &newAssignee, tk.GetAssigneeID())
+	})
+
+	t.Run("should return an error when assigning a nil AssigneeID", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		err = tk.AssignTo(nil)
+
+		assert.ErrorIs(t, err, domainErr.ErrInvalidAssignee)
+	})
+
+	t.Run("should return an error when assigning a closed Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.Close())
+
+		err = tk.AssignTo(assignee)
+
+		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
+	})
+
+	t.Run("should change the priority of a Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		newPriority, err := valueobjects.NewPriority(string(valueobjects.TicketPriorityLow))
+		assert.NoError(t, err)
+
+		err = tk.ChangePriority(&newPriority)
+
+		assert.NoError(t, err)
+		assert.Equal(t, &newPriority, tk.GetPriority())
+	})
+
+	t.Run("should return an error when changing to a nil Priority", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		err = tk.ChangePriority(nil)
+
+		assert.ErrorIs(t, err, domainErr.ErrInvalidPriority)
+	})
+
+	t.Run("should return an error when changing the priority of a closed Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.Close())
+
+		err = tk.ChangePriority(priority)
+
+		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
+	})
+
+	t.Run("should move an open Ticket to in progress", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		err = tk.MoveToInProgress()
+
+		assert.NoError(t, err)
+		assert.Equal(t, valueobjects.TicketStatusInProgress, tk.GetStatus())
+	})
+
+	t.Run("should return an error when moving a non-open Ticket to in progress", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.MoveToInProgress())
+
+		err = tk.MoveToInProgress()
+
+		assert.ErrorIs(t, err, domainErr.ErrInvalidStatusTransition)
+	})
+
+	t.Run("should close an open Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		err = tk.Close()
+
+		assert.NoError(t, err)
+		assert.Equal(t, valueobjects.TicketStatusClosed, tk.GetStatus())
+	})
+
+	t.Run("should close a Ticket that is in progress", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.MoveToInProgress())
+
+		err = tk.Close()
+
+		assert.NoError(t, err)
+		assert.Equal(t, valueobjects.TicketStatusClosed, tk.GetStatus())
+	})
+
+	t.Run("should return an error when closing an already closed Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.Close())
+
+		err = tk.Close()
+
+		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
+	})
 }

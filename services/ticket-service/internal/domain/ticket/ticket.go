@@ -72,6 +72,44 @@ func (t *Ticket) GetCreatedAt() time.Time {
 	return t.createdAt
 }
 
+func (t *Ticket) AssignTo(assigneeID *valueobjects.AssigneeID) error {
+	if t.status == valueobjects.TicketStatusClosed {
+		return domainErr.ErrTicketAlreadyClosed
+	}
+	if assigneeID == nil {
+		return domainErr.ErrInvalidAssignee
+	}
+	t.assigneeID = assigneeID
+	return nil
+}
+
+func (t *Ticket) ChangePriority(priority *valueobjects.Priority) error {
+	if t.status == valueobjects.TicketStatusClosed {
+		return domainErr.ErrTicketAlreadyClosed
+	}
+	if priority == nil {
+		return domainErr.ErrInvalidPriority
+	}
+	t.priority = priority
+	return nil
+}
+
+func (t *Ticket) MoveToInProgress() error {
+	if t.status != valueobjects.TicketStatusOpen {
+		return domainErr.ErrInvalidStatusTransition
+	}
+	t.status = valueobjects.TicketStatusInProgress
+	return nil
+}
+
+func (t *Ticket) Close() error {
+	if t.status == valueobjects.TicketStatusClosed {
+		return domainErr.ErrTicketAlreadyClosed
+	}
+	t.status = valueobjects.TicketStatusClosed
+	return nil
+}
+
 func (t *Ticket) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		ID          string `json:"id"`

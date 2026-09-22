@@ -10,4 +10,7 @@ var (
 	ErrInvalidAssignee    = errors.New("invalid assignee: assignee cannot be empty")
 	ErrInvalidID          = errors.New("invalid ID: ID cannot be empty")
 	ErrInvalidUUID        = errors.New("invalid UUID: UUID cannot be empty")
+
+	ErrTicketAlreadyClosed     = errors.New("invalid operation: ticket is already closed")
+	ErrInvalidStatusTransition = errors.New("invalid status transition")
 )
