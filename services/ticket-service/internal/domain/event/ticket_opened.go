@@ -6,21 +6,23 @@ type TicketOpened struct {
 	baseEvent
 	Title       string
 	Description string
-	Priority    string
+	Status      string
 	AssigneeID  string
+	Priority    string
 }
 
-func NewTicketOpened(id *valueobjects.ID, title *valueobjects.Title, description *valueobjects.Description, priority *valueobjects.Priority, assigneeID *valueobjects.AssigneeID) TicketOpened {
+func NewTicketOpened(id *valueobjects.ID, title *valueobjects.Title, description *valueobjects.Description, status valueobjects.Status, assigneeID *valueobjects.AssigneeID, priority *valueobjects.Priority) TicketOpened {
 	e := TicketOpened{
 		baseEvent:   newBaseEvent(id.GetID()),
 		Title:       title.GetTitle(),
 		Description: description.GetDescription(),
-	}
-	if priority != nil {
-		e.Priority = priority.GetPriority()
+		Status:      status.String(),
 	}
 	if assigneeID != nil {
 		e.AssigneeID = assigneeID.GetAssigneeID()
+	}
+	if priority != nil {
+		e.Priority = priority.GetPriority()
 	}
 	return e
 }

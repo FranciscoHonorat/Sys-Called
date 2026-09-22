@@ -20,4 +20,7 @@ var (
 
 	ErrInvalidResponse        = errors.New("invalid response: response cannot be nil")
 	ErrResponseTicketMismatch = errors.New("invalid response: response does not belong to this ticket")
+
+	ErrEmptyEventHistory   = errors.New("invalid history: event history cannot be empty")
+	ErrInvalidEventHistory = errors.New("invalid history: first event must be TicketOpened")
 )

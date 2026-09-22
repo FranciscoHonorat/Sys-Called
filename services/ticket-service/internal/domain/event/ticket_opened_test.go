@@ -24,13 +24,14 @@ func TestTicketOpened(t *testing.T) {
 		assignee, err := valueobjects.NewAssigneeID("agent-1")
 		assert.NoError(t, err)
 
-		e := event.NewTicketOpened(id, title, description, &priority, &assignee)
+		e := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, &assignee, &priority)
 
 		assert.Equal(t, "TicketOpened", e.EventName())
 		assert.Equal(t, id.GetID(), e.AggregateID())
 		assert.WithinDuration(t, time.Now(), e.OccurredAt(), time.Second)
 		assert.Equal(t, "Valid Title", e.Title)
 		assert.Equal(t, "Valid Description", e.Description)
+		assert.Equal(t, string(valueobjects.TicketStatusOpen), e.Status)
 		assert.Equal(t, string(valueobjects.TicketPriorityHigh), e.Priority)
 		assert.Equal(t, "agent-1", e.AssigneeID)
 	})
@@ -42,7 +43,7 @@ func TestTicketOpened(t *testing.T) {
 		description, err := valueobjects.NewDescription("Valid Description")
 		assert.NoError(t, err)
 
-		e := event.NewTicketOpened(id, title, description, nil, nil)
+		e := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil)
 
 		assert.Empty(t, e.Priority)
 		assert.Empty(t, e.AssigneeID)
