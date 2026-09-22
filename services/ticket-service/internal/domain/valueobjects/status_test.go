@@ -3,6 +3,7 @@ package valueobjects_test
 import (
 	"testing"
 
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	status "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 	"github.com/stretchr/testify/assert"
 )
@@ -53,6 +54,6 @@ func TestStatus(t *testing.T) {
 		err := unmarshaledStatus.UnmarshalJSON(invalidStatusJSON)
 
 		assert.Error(t, err)
-		assert.EqualError(t, err, "invalid status: Invalid")
+		assert.ErrorIs(t, err, domainErr.ErrInvalidStatus)
 	})
 }

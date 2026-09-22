@@ -3,6 +3,7 @@ package valueobjects_test
 import (
 	"testing"
 
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	priority "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 
 	"github.com/stretchr/testify/assert"
@@ -54,6 +55,6 @@ func TestPriority(t *testing.T) {
 		err := unmarshaledPriority.UnmarshalJSON(invalidPriorityJSON)
 
 		assert.Error(t, err)
-		assert.EqualError(t, err, "invalid priority: Invalid")
+		assert.ErrorIs(t, err, domainErr.ErrInvalidPriority)
 	})
 }

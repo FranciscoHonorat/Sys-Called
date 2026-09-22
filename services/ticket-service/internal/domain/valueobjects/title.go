@@ -1,6 +1,8 @@
 package valueobjects
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type Title struct {
 	Title string
@@ -19,6 +21,9 @@ func (t *Title) IsValid() bool {
 }
 
 func (t *Title) Equals(other *Title) bool {
+	if other == nil {
+		return false
+	}
 	return t.Title == other.Title
 }
 
