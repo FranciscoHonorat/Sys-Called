@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: go (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ticket-service, employees-service]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/${{ matrix.service }}/go.mod
+
+      - name: Check go.mod/go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -race
+
+  docker:
+    name: docker build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ticket-service, employees-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          push: false
+          tags: sys-called-${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  compose-smoke:
+    name: docker compose smoke test
+    runs-on: ubuntu-latest
+    needs: [go, docker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: docker compose up --build -d
+
+      - name: Wait for services to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:18080/healthz >/dev/null && curl -sf http://localhost:18081/healthz >/dev/null; then
+              echo "services are up"
+              exit 0
+            fi
+            echo "waiting for services... ($i)"
+            sleep 2
+          done
+          echo "services did not become healthy in time"
+          exit 1
+
+      - name: Wait for responsibles to sync via Kafka
+        run: |
+          for i in $(seq 1 30); do
+            count=$(docker compose exec -T postgres psql -U ticket_service -d ticket_service -tAc "SELECT count(*) FROM responsibles;" || echo 0)
+            if [ "$count" -ge 3 ]; then
+              echo "responsibles synced"
+              exit 0
+            fi
+            echo "waiting for responsibles projection... ($i)"
+            sleep 2
+          done
+          echo "responsibles were not synced in time"
+          exit 1
+
+      - name: Smoke test ticket lifecycle and automatic assignment
+        run: |
+          set -euo pipefail
+
+          ticket=$(curl -sf -X POST http://localhost:18080/tickets \
+            -H "Content-Type: application/json" \
+            -d '{"title":"CI smoke ticket","description":"Created by CI"}')
+          echo "$ticket"
+          id=$(echo "$ticket" | grep -o '"ticket_id":"[^"]*"' | cut -d'"' -f4)
+
+          assign=$(curl -sf -X POST "http://localhost:18080/tickets/$id/assign/auto")
+          echo "$assign"
+          echo "$assign" | grep -q '"assignee_id"'
+
+          list=$(curl -sf http://localhost:18080/tickets)
+          echo "$list" | grep -q "$id"
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

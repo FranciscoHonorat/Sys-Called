@@ -1,4 +1,4 @@
-MODULES := ./services/ticket-service ./services/employees-service ./shared
+MODULES := ./services/ticket-service ./services/employees-service
 DOCKER_COMPOSE=docker compose
 
 .PHONY: help build run test test-integration fmt tidy docker-build docker-build-inventory docker-build-cdc docker-build-user docker-up docker-down
@@ -8,7 +8,7 @@ help:
 	@echo "  build   - Build the Go modules"
 	@echo "  vet     - Run go vet on the Go modules"
 	@echo "  test    - Run tests for the Go modules"
-	@echo "  fmt     - Format the Go code in services and shared directories"
+	@echo "  fmt     - Format the Go code in the services directories"
 	@echo "  run     - Run the ticket-service"
 	@echo "  docker-up      - Start Docker containers in detached mode"
 	@echo "  docker-down    - Stop Docker containers"
@@ -23,10 +23,6 @@ run:
 
 test:
 	@for m in $(MODULES); do \
-		if [ -z "$$(find $$m -name '*.go' -print -quit)" ]; then \
-			echo "==> skipping $$m (no Go files yet)"; \
-			continue; \
-		fi; \
 		echo "==> go test ./... ($$m)"; \
 		(cd $$m && go test ./...) || exit 1; \
 	done
