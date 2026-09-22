@@ -26,6 +26,9 @@ func (id *ID) String() string {
 }
 
 func (id *ID) Equals(other *ID) bool {
+	if other == nil {
+		return false
+	}
 	return id.ID == other.ID
 }
 

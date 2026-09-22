@@ -2,7 +2,8 @@ package valueobjects
 
 import (
 	"encoding/json"
-	"fmt"
+
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 )
 
 type Priority string
@@ -13,8 +14,12 @@ const (
 	TicketPriorityHigh   Priority = "High"
 )
 
-func NewPriority(priority string) Priority {
-	return Priority(priority)
+func NewPriority(priority string) (Priority, error) {
+	ticketPriority := Priority(priority)
+	if !ticketPriority.IsValid() {
+		return "", domainErr.ErrInvalidPriority
+	}
+	return ticketPriority, nil
 }
 
 func (p Priority) IsValid() bool {
@@ -45,7 +50,7 @@ func (p *Priority) UnmarshalJSON(data []byte) error {
 	}
 	ticketPriority := Priority(priority)
 	if !ticketPriority.IsValid() {
-		return fmt.Errorf("invalid priority: %s", priority)
+		return domainErr.ErrInvalidPriority
 	}
 	*p = ticketPriority
 	return nil

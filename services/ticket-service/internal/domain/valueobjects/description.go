@@ -1,11 +1,21 @@
 package valueobjects
 
+import (
+	"encoding/json"
+
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
+)
+
 type Description struct {
 	Description string
 }
 
-func NewDescription(description string) *Description {
-	return &Description{Description: description}
+func NewDescription(description string) (*Description, error) {
+	d := &Description{Description: description}
+	if !d.IsValid() {
+		return nil, domainErr.ErrInvalidDescription
+	}
+	return d, nil
 }
 
 func (d *Description) GetDescription() string {
@@ -24,10 +34,14 @@ func (d *Description) Equals(other *Description) bool {
 }
 
 func (d *Description) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + d.Description + `"`), nil
+	return json.Marshal(d.Description)
 }
 
 func (d *Description) UnmarshalJSON(data []byte) error {
-	d.Description = string(data[1 : len(data)-1]) // Remove quotes
+	var description string
+	if err := json.Unmarshal(data, &description); err != nil {
+		return err
+	}
+	d.Description = description
 	return nil
 }
