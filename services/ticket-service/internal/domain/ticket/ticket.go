@@ -1,0 +1,170 @@
+package ticket
+
+import (
+	"encoding/json"
+	"time"
+
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
+	"github.com/google/uuid"
+)
+
+type Ticket struct {
+	id          *valueobjects.ID
+	title       *valueobjects.Title
+	description *valueobjects.Description
+	status      valueobjects.Status
+	assigneeID  *valueobjects.AssigneeID
+	priority    *valueobjects.Priority
+	createdAt   time.Time
+}
+
+func NewTicket(id *valueobjects.ID, title *valueobjects.Title, description *valueobjects.Description, status valueobjects.Status, assigneeID *valueobjects.AssigneeID, priority *valueobjects.Priority) (*Ticket, error) {
+	if id == nil {
+		return nil, domainErr.ErrInvalidID
+	}
+	if title == nil {
+		return nil, domainErr.ErrInvalidTitle
+	}
+	if description == nil {
+		return nil, domainErr.ErrInvalidDescription
+	}
+	if !status.IsValid() {
+		return nil, domainErr.ErrInvalidStatus
+	}
+
+	return &Ticket{
+		id:          id,
+		title:       title,
+		description: description,
+		status:      status,
+		assigneeID:  assigneeID,
+		priority:    priority,
+		createdAt:   time.Now(),
+	}, nil
+}
+
+func (t *Ticket) GetID() *valueobjects.ID {
+	return t.id
+}
+
+func (t *Ticket) GetTitle() *valueobjects.Title {
+	return t.title
+}
+
+func (t *Ticket) GetDescription() *valueobjects.Description {
+	return t.description
+}
+
+func (t *Ticket) GetStatus() valueobjects.Status {
+	return t.status
+}
+
+func (t *Ticket) GetAssigneeID() *valueobjects.AssigneeID {
+	return t.assigneeID
+}
+
+func (t *Ticket) GetPriority() *valueobjects.Priority {
+	return t.priority
+}
+
+func (t *Ticket) GetCreatedAt() time.Time {
+	return t.createdAt
+}
+
+func (t *Ticket) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		ID          string `json:"id"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+		AssigneeID  string `json:"assignee_id,omitempty"`
+		Priority    string `json:"priority,omitempty"`
+		CreatedAt   string `json:"created_at"`
+	}{
+		ID:          t.id.String(),
+		Title:       t.title.GetTitle(),
+		Description: t.description.GetDescription(),
+		Status:      t.status.String(),
+		CreatedAt:   t.createdAt.Format(time.RFC3339),
+	}
+
+	if t.assigneeID != nil {
+		aux.AssigneeID = t.assigneeID.GetAssigneeID()
+	}
+	if t.priority != nil {
+		aux.Priority = t.priority.GetPriority()
+	}
+
+	return json.Marshal(aux)
+}
+
+func (t *Ticket) UnmarshalJSON(data []byte) error {
+	aux := struct {
+		ID          string `json:"id"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+		AssigneeID  string `json:"assignee_id"`
+		Priority    string `json:"priority"`
+		CreatedAt   string `json:"created_at"`
+	}{}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	parsedID := uuid.Nil
+	if aux.ID != "" {
+		var err error
+		parsedID, err = uuid.Parse(aux.ID)
+		if err != nil {
+			return domainErr.ErrInvalidUUID
+		}
+	}
+	t.id = valueobjects.NewID(parsedID)
+
+	title, err := valueobjects.NewTitle(aux.Title)
+	if err != nil {
+		return err
+	}
+	t.title = title
+
+	description, err := valueobjects.NewDescription(aux.Description)
+	if err != nil {
+		return err
+	}
+	t.description = description
+
+	status := valueobjects.NewStatus(aux.Status)
+	if !status.IsValid() {
+		return domainErr.ErrInvalidStatus
+	}
+	t.status = status
+
+	t.assigneeID = nil
+	if aux.AssigneeID != "" {
+		assigneeID, err := valueobjects.NewAssigneeID(aux.AssigneeID)
+		if err != nil {
+			return err
+		}
+		t.assigneeID = &assigneeID
+	}
+
+	t.priority = nil
+	if aux.Priority != "" {
+		priority, err := valueobjects.NewPriority(aux.Priority)
+		if err != nil {
+			return err
+		}
+		t.priority = &priority
+	}
+
+	createdAt, err := time.Parse(time.RFC3339, aux.CreatedAt)
+	if err != nil {
+		return err
+	}
+	t.createdAt = createdAt
+
+	return nil
+}
