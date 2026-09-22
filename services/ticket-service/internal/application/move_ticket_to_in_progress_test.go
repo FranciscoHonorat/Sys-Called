@@ -15,7 +15,7 @@ func TestMoveTicketToInProgressUseCase(t *testing.T) {
 	t.Run("should move an existing open ticket to in progress", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewMoveTicketToInProgressUseCase(store)
+		uc := application.NewMoveTicketToInProgressUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.MoveTicketToInProgressInput{
 			TicketID: ticketID,
@@ -29,7 +29,7 @@ func TestMoveTicketToInProgressUseCase(t *testing.T) {
 
 	t.Run("should return an error when the ticket does not exist", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewMoveTicketToInProgressUseCase(store)
+		uc := application.NewMoveTicketToInProgressUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.MoveTicketToInProgressInput{
 			TicketID: "00000000-0000-0000-0000-000000000001",
@@ -41,7 +41,7 @@ func TestMoveTicketToInProgressUseCase(t *testing.T) {
 	t.Run("should return an error when the ticket is already in progress", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewMoveTicketToInProgressUseCase(store)
+		uc := application.NewMoveTicketToInProgressUseCase(store, newTestCache())
 		assert.NoError(t, uc.Execute(context.Background(), application.MoveTicketToInProgressInput{TicketID: ticketID}))
 
 		err := uc.Execute(context.Background(), application.MoveTicketToInProgressInput{TicketID: ticketID})

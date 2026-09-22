@@ -18,10 +18,11 @@ type ChangeTicketPriorityInput struct {
 
 type ChangeTicketPriorityUseCase struct {
 	store repository.EventStore
+	cache repository.TicketCache
 }
 
-func NewChangeTicketPriorityUseCase(store repository.EventStore) *ChangeTicketPriorityUseCase {
-	return &ChangeTicketPriorityUseCase{store: store}
+func NewChangeTicketPriorityUseCase(store repository.EventStore, cache repository.TicketCache) *ChangeTicketPriorityUseCase {
+	return &ChangeTicketPriorityUseCase{store: store, cache: cache}
 }
 
 func (uc *ChangeTicketPriorityUseCase) Execute(ctx context.Context, input ChangeTicketPriorityInput) error {
@@ -53,6 +54,7 @@ func (uc *ChangeTicketPriorityUseCase) Execute(ctx context.Context, input Change
 		return err
 	}
 	t.ClearUncommittedEvents()
+	uc.cache.Set(ctx, t)
 
 	return nil
 }

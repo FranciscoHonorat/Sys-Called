@@ -1,4 +1,4 @@
-CREATE TABLE ticket_events (
+CREATE TABLE IF NOT EXISTS ticket_events (
     id UUID PRIMARY KEY,
     aggregate_id UUID NOT NULL,
     version INTEGER NOT NULL,
@@ -8,4 +8,4 @@ CREATE TABLE ticket_events (
     UNIQUE (aggregate_id, version)
 );
 
-CREATE INDEX idx_ticket_events_aggregate_id ON ticket_events (aggregate_id, version);
+CREATE INDEX IF NOT EXISTS idx_ticket_events_aggregate_id ON ticket_events (aggregate_id, version);

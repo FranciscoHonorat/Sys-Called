@@ -18,10 +18,11 @@ type AssignTicketInput struct {
 
 type AssignTicketUseCase struct {
 	store repository.EventStore
+	cache repository.TicketCache
 }
 
-func NewAssignTicketUseCase(store repository.EventStore) *AssignTicketUseCase {
-	return &AssignTicketUseCase{store: store}
+func NewAssignTicketUseCase(store repository.EventStore, cache repository.TicketCache) *AssignTicketUseCase {
+	return &AssignTicketUseCase{store: store, cache: cache}
 }
 
 func (uc *AssignTicketUseCase) Execute(ctx context.Context, input AssignTicketInput) error {
@@ -53,6 +54,7 @@ func (uc *AssignTicketUseCase) Execute(ctx context.Context, input AssignTicketIn
 		return err
 	}
 	t.ClearUncommittedEvents()
+	uc.cache.Set(ctx, t)
 
 	return nil
 }

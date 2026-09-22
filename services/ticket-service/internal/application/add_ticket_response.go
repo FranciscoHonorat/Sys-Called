@@ -20,10 +20,11 @@ type AddTicketResponseInput struct {
 
 type AddTicketResponseUseCase struct {
 	store repository.EventStore
+	cache repository.TicketCache
 }
 
-func NewAddTicketResponseUseCase(store repository.EventStore) *AddTicketResponseUseCase {
-	return &AddTicketResponseUseCase{store: store}
+func NewAddTicketResponseUseCase(store repository.EventStore, cache repository.TicketCache) *AddTicketResponseUseCase {
+	return &AddTicketResponseUseCase{store: store, cache: cache}
 }
 
 func (uc *AddTicketResponseUseCase) Execute(ctx context.Context, input AddTicketResponseInput) error {
@@ -65,6 +66,7 @@ func (uc *AddTicketResponseUseCase) Execute(ctx context.Context, input AddTicket
 		return err
 	}
 	t.ClearUncommittedEvents()
+	uc.cache.Set(ctx, t)
 
 	return nil
 }

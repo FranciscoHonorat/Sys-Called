@@ -16,10 +16,11 @@ type MoveTicketToInProgressInput struct {
 
 type MoveTicketToInProgressUseCase struct {
 	store repository.EventStore
+	cache repository.TicketCache
 }
 
-func NewMoveTicketToInProgressUseCase(store repository.EventStore) *MoveTicketToInProgressUseCase {
-	return &MoveTicketToInProgressUseCase{store: store}
+func NewMoveTicketToInProgressUseCase(store repository.EventStore, cache repository.TicketCache) *MoveTicketToInProgressUseCase {
+	return &MoveTicketToInProgressUseCase{store: store, cache: cache}
 }
 
 func (uc *MoveTicketToInProgressUseCase) Execute(ctx context.Context, input MoveTicketToInProgressInput) error {
@@ -46,6 +47,7 @@ func (uc *MoveTicketToInProgressUseCase) Execute(ctx context.Context, input Move
 		return err
 	}
 	t.ClearUncommittedEvents()
+	uc.cache.Set(ctx, t)
 
 	return nil
 }

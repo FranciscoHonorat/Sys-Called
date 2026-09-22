@@ -16,10 +16,11 @@ type CloseTicketInput struct {
 
 type CloseTicketUseCase struct {
 	store repository.EventStore
+	cache repository.TicketCache
 }
 
-func NewCloseTicketUseCase(store repository.EventStore) *CloseTicketUseCase {
-	return &CloseTicketUseCase{store: store}
+func NewCloseTicketUseCase(store repository.EventStore, cache repository.TicketCache) *CloseTicketUseCase {
+	return &CloseTicketUseCase{store: store, cache: cache}
 }
 
 func (uc *CloseTicketUseCase) Execute(ctx context.Context, input CloseTicketInput) error {
@@ -46,6 +47,7 @@ func (uc *CloseTicketUseCase) Execute(ctx context.Context, input CloseTicketInpu
 		return err
 	}
 	t.ClearUncommittedEvents()
+	uc.cache.Set(ctx, t)
 
 	return nil
 }

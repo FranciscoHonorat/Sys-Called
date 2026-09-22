@@ -14,7 +14,7 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 	t.Run("should add a response to an existing ticket", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewAddTicketResponseUseCase(store)
+		uc := application.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AddTicketResponseInput{
 			TicketID: ticketID,
@@ -31,7 +31,7 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 
 	t.Run("should return an error when the ticket does not exist", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewAddTicketResponseUseCase(store)
+		uc := application.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AddTicketResponseInput{
 			TicketID: "00000000-0000-0000-0000-000000000001",
@@ -45,7 +45,7 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 	t.Run("should return an error for an empty content", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewAddTicketResponseUseCase(store)
+		uc := application.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AddTicketResponseInput{
 			TicketID: ticketID,
@@ -59,8 +59,8 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 	t.Run("should return an error when adding a response to a closed ticket", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		assert.NoError(t, application.NewCloseTicketUseCase(store).Execute(context.Background(), application.CloseTicketInput{TicketID: ticketID}))
-		uc := application.NewAddTicketResponseUseCase(store)
+		assert.NoError(t, application.NewCloseTicketUseCase(store, newTestCache()).Execute(context.Background(), application.CloseTicketInput{TicketID: ticketID}))
+		uc := application.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AddTicketResponseInput{
 			TicketID: ticketID,

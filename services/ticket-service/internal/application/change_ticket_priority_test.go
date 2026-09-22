@@ -14,7 +14,7 @@ func TestChangeTicketPriorityUseCase(t *testing.T) {
 	t.Run("should change the priority of an existing ticket", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewChangeTicketPriorityUseCase(store)
+		uc := application.NewChangeTicketPriorityUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.ChangeTicketPriorityInput{
 			TicketID: ticketID,
@@ -29,7 +29,7 @@ func TestChangeTicketPriorityUseCase(t *testing.T) {
 
 	t.Run("should return an error when the ticket does not exist", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewChangeTicketPriorityUseCase(store)
+		uc := application.NewChangeTicketPriorityUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.ChangeTicketPriorityInput{
 			TicketID: "00000000-0000-0000-0000-000000000001",
@@ -42,7 +42,7 @@ func TestChangeTicketPriorityUseCase(t *testing.T) {
 	t.Run("should return an error for an invalid priority", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewChangeTicketPriorityUseCase(store)
+		uc := application.NewChangeTicketPriorityUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.ChangeTicketPriorityInput{
 			TicketID: ticketID,

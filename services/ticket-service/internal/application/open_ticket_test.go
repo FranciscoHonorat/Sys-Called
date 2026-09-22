@@ -16,7 +16,7 @@ import (
 func TestOpenTicketUseCase(t *testing.T) {
 	t.Run("should open a new ticket and persist a TicketOpened event", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewOpenTicketUseCase(store)
+		uc := application.NewOpenTicketUseCase(store, newTestCache())
 
 		output, err := uc.Execute(context.Background(), application.OpenTicketInput{
 			Title:       "Valid Title",
@@ -44,7 +44,7 @@ func TestOpenTicketUseCase(t *testing.T) {
 
 	t.Run("should open a new ticket without an assignee or priority", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewOpenTicketUseCase(store)
+		uc := application.NewOpenTicketUseCase(store, newTestCache())
 
 		output, err := uc.Execute(context.Background(), application.OpenTicketInput{
 			Title:       "Valid Title",
@@ -57,7 +57,7 @@ func TestOpenTicketUseCase(t *testing.T) {
 
 	t.Run("should return an error for an invalid title", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewOpenTicketUseCase(store)
+		uc := application.NewOpenTicketUseCase(store, newTestCache())
 
 		_, err := uc.Execute(context.Background(), application.OpenTicketInput{
 			Title:       "",
@@ -69,7 +69,7 @@ func TestOpenTicketUseCase(t *testing.T) {
 
 	t.Run("should return an error for an invalid priority", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewOpenTicketUseCase(store)
+		uc := application.NewOpenTicketUseCase(store, newTestCache())
 
 		_, err := uc.Execute(context.Background(), application.OpenTicketInput{
 			Title:       "Valid Title",

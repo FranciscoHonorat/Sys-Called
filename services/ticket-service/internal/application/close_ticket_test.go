@@ -15,7 +15,7 @@ func TestCloseTicketUseCase(t *testing.T) {
 	t.Run("should close an existing ticket", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewCloseTicketUseCase(store)
+		uc := application.NewCloseTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.CloseTicketInput{
 			TicketID: ticketID,
@@ -29,7 +29,7 @@ func TestCloseTicketUseCase(t *testing.T) {
 
 	t.Run("should return an error when the ticket does not exist", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewCloseTicketUseCase(store)
+		uc := application.NewCloseTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.CloseTicketInput{
 			TicketID: "00000000-0000-0000-0000-000000000001",
@@ -41,7 +41,7 @@ func TestCloseTicketUseCase(t *testing.T) {
 	t.Run("should return an error when the ticket is already closed", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewCloseTicketUseCase(store)
+		uc := application.NewCloseTicketUseCase(store, newTestCache())
 		assert.NoError(t, uc.Execute(context.Background(), application.CloseTicketInput{TicketID: ticketID}))
 
 		err := uc.Execute(context.Background(), application.CloseTicketInput{TicketID: ticketID})

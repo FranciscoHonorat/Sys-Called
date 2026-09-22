@@ -16,7 +16,7 @@ import (
 func openTestTicket(t *testing.T, store *fakeEventStore) string {
 	t.Helper()
 
-	output, err := application.NewOpenTicketUseCase(store).Execute(context.Background(), application.OpenTicketInput{
+	output, err := application.NewOpenTicketUseCase(store, newTestCache()).Execute(context.Background(), application.OpenTicketInput{
 		Title:       "Valid Title",
 		Description: "Valid Description",
 	})
@@ -29,7 +29,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 	t.Run("should assign an existing ticket", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewAssignTicketUseCase(store)
+		uc := application.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AssignTicketInput{
 			TicketID:   ticketID,
@@ -44,7 +44,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 
 	t.Run("should return an error for an invalid ticket ID", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewAssignTicketUseCase(store)
+		uc := application.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AssignTicketInput{
 			TicketID:   "not-a-uuid",
@@ -56,7 +56,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 
 	t.Run("should return an error when the ticket does not exist", func(t *testing.T) {
 		store := newFakeEventStore()
-		uc := application.NewAssignTicketUseCase(store)
+		uc := application.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AssignTicketInput{
 			TicketID:   "00000000-0000-0000-0000-000000000001",
@@ -69,7 +69,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 	t.Run("should return an error for an invalid assignee", func(t *testing.T) {
 		store := newFakeEventStore()
 		ticketID := openTestTicket(t, store)
-		uc := application.NewAssignTicketUseCase(store)
+		uc := application.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), application.AssignTicketInput{
 			TicketID:   ticketID,

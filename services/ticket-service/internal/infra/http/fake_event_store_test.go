@@ -1,4 +1,4 @@
-package application_test
+package httpapi_test
 
 import (
 	"context"
@@ -7,12 +7,7 @@ import (
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/event"
-	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/infra/cache"
 )
-
-func newTestCache() *cache.InMemoryTicketCache {
-	return cache.NewInMemoryTicketCache()
-}
 
 type fakeEventStore struct {
 	streams map[uuid.UUID][]event.Event
@@ -37,8 +32,4 @@ func (s *fakeEventStore) Load(_ context.Context, aggregateID uuid.UUID) ([]event
 		return nil, domainErr.ErrEventStreamNotFound
 	}
 	return events, nil
-}
-
-func (s *fakeEventStore) forgetAll() {
-	s.streams = make(map[uuid.UUID][]event.Event)
 }
