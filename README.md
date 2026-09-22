@@ -11,7 +11,7 @@ Neste README explico como rodar o projeto, minhas escolhas tecnológicas e arqui
 - Docker e Docker Compose (é tudo que eu preciso pra rodar o projeto inteiro — não instalei nada manualmente).
 - Opcionalmente, Go 1.26+ se eu quiser rodar os serviços fora de container (ver segunda opção abaixo).
 
-Não precisei criar nem popular banco manualmente: as migrações (SQL puro, em `internal/infra/postgres/migrations/` de cada serviço) rodam automaticamente como um passo do `docker-compose.yml`, e cada serviço já sobe com dados seed (o `employees-service` registra 3 responsáveis fixos na primeira execução).
+Não precisei criar nem popular banco manualmente: as migrações (SQL puro, em `internal/adapters/out/postgres/migrations/` de cada serviço) rodam automaticamente como um passo do `docker-compose.yml`, e cada serviço já sobe com dados seed (o `employees-service` registra 3 responsáveis fixos na primeira execução).
 
 ### Subindo tudo com Docker Compose (é o que eu recomendo)
 
@@ -78,20 +78,22 @@ Fui bem além do mínimo pedido pelo desafio — sei que isso é mais do que o "
 
 - **Dois serviços independentes** (`ticket-service` e `employees-service`) em vez de uma aplicação única, cada um dono do seu próprio banco. Separei porque "chamados" e "funcionários" são domínios com motivos de mudança bem diferentes — quem mexe em regra de atendimento não deveria precisar tocar em cadastro de funcionário, e vice-versa.
 - **Event Sourcing** no `ticket-service`: em vez de guardar só o estado atual de um chamado, guardo cada evento que aconteceu com ele (aberto, editado, atribuído, prioridade mudada, etc.) e reconstruo o estado a partir do histórico. Escolhi isso porque rastreabilidade — "quem fez o quê e quando" — é exatamente o tipo de coisa que a pessoa que pediu o sistema (a área administrativa, no enunciado) provavelmente vai querer no futuro, e é muito mais barato ter isso desde o início do que adicionar depois.
-- **DDD tático** (agregados, value objects, eventos de domínio, repositórios como interface) pra manter a regra de negócio isolada de framework HTTP e de banco.
-- **Comunicação assíncrona entre os serviços via Kafka + Outbox Pattern**, em vez de um serviço chamar o outro por HTTP direto. Cheguei a implementar a versão síncrona primeiro, percebi que isso deixava a distribuição automática de chamados refém do `employees-service` estar no ar, e troquei pela versão assíncrona — deixei esse processo de decisão registrado no [ADR-005](docs/decisions/ADR-005-comunicacao-assincrona-employees-ticket.md), porque acho que o raciocínio por trás da mudança é mais interessante do que só o resultado final.
-- **Testes em todas as camadas**, seguindo TDD como prática (documentei essa decisão à parte no [ADR-002](docs/decisions/ADR-002-TDD.md)) — pra mim isso pesa mais do que ter mais funcionalidades, como o próprio desafio sugere ("Qualidade > Quantidade").
+- **DDD tático** (agregados, value objects, eventos de domínio) pra concentrar a regra de negócio no domínio.
+- **Arquitetura hexagonal (portas e adaptadores)** dentro de cada serviço, pra manter domínio e casos de uso isolados de framework HTTP, banco e broker — detalho abaixo.
+- **Comunicação assíncrona entre os serviços via Kafka + Outbox Pattern**, em vez de um serviço chamar o outro por HTTP direto. Cheguei a implementar a versão síncrona primeiro, percebi que isso deixava a distribuição automática de chamados refém do `employees-service` estar no ar, e troquei pela versão assíncrona — o `employees-service` grava o funcionário e o evento `EmployeeRegistered` na tabela de outbox na mesma transação, um relay publica no Kafka, e o `ticket-service` mantém sua própria cópia dos responsáveis a partir desses eventos.
+- **Testes em todas as camadas**, seguindo TDD como prática — pra mim isso pesa mais do que ter mais funcionalidades, como o próprio desafio sugere ("Qualidade > Quantidade").
 
-Documentei cada decisão maior como um ADR em [`docs/decisions/`](docs/decisions/), incluindo os antipadrões e dívidas técnicas que assumi conscientemente em cada serviço — prefiro deixar isso visível a fingir que não existe:
+### Arquitetura interna: portas e adaptadores
 
-| ADR | Assunto |
-|---|---|
-| [ADR-001](docs/decisions/ADR-001-architecture.md) | Arquitetura geral: microsserviços orientados a eventos, DDD, bounded contexts |
-| [ADR-002](docs/decisions/ADR-002-TDD.md) | Adoção de TDD |
-| [ADR-003](docs/decisions/ADR-003-ticket-service.md) | Implementação do `ticket-service`: camadas, event sourcing, padrões e antipadrões |
-| [ADR-004](docs/decisions/ADR-004-employees-service.md) | Implementação do `employees-service`: persistência, outbox |
-| [ADR-005](docs/decisions/ADR-005-comunicacao-assincrona-employees-ticket.md) | Comunicação assíncrona entre os dois serviços via Outbox + Kafka |
-| [ADR-006](docs/decisions/ADR-006-ci-e-dependabot.md) | Pipeline de CI e atualização de dependências |
+Os dois serviços seguem a mesma organização, e a regra é uma só: as dependências apontam sempre para dentro.
+
+- **`domain/`** — agregados, value objects, eventos e erros. Não conhece nenhuma outra camada nem biblioteca de infraestrutura. É o domínio que decide quais eventos acontecem (por exemplo, `employee.Register` já registra o `EmployeeRegistered`).
+- **`application/`** — os casos de uso e as **portas de saída** (`application/port/out`), que são as interfaces de que os casos de uso precisam: `EventStore`, `TicketCache`, `ResponsibleDirectory`, `EmployeeRepository`, `OutboxStore`, `EventPublisher`. No `ticket-service` separei escrita e leitura em `command/` e `query/` — com event sourcing isso deixa o caminho pronto pra, no futuro, as queries lerem de uma projeção sem tocar nos commands.
+- **`adapters/in/`** — quem dispara os casos de uso: HTTP (Gin), o consumer Kafka do `ticket-service` e o relay do outbox do `employees-service`. Adaptadores de entrada nunca falam com adaptadores de saída; o consumer de funcionários, por exemplo, passa pelo caso de uso `SyncResponsible` em vez de gravar direto no Postgres.
+- **`adapters/out/`** — implementações das portas: Postgres, cache em memória, publisher Kafka.
+- **`cmd/server/main.go`** — o único lugar que conhece tudo: instancia os adaptadores, monta os casos de uso e os injeta nos adaptadores de entrada.
+
+Pra essa regra não depender só de disciplina, cada serviço tem um teste de arquitetura (`internal/architecture_test.go`) que lê os imports de todos os pacotes e falha se o domínio importar aplicação ou adaptadores, se a aplicação importar adaptadores, se um adaptador importar outro, ou se domínio/aplicação importarem Gin, pgx ou kafka-go. Ele roda junto com o resto da suíte no `make test` e no CI.
 
 ## Como atendi cada requisito do desafio
 
@@ -101,7 +103,7 @@ Implementei cadastro (`POST /tickets`), edição (`PUT /tickets/:id`), listagem 
 
 ### 3.0 — Responsáveis pelo atendimento
 
-Segui a sugestão do próprio enunciado de não construir um cadastro completo: o `employees-service` sobe com 3 responsáveis fixos (`GET /employees` lista os disponíveis). Optei por fazer disso um serviço de verdade, com seu próprio banco, em vez de uma lista estática dentro do `ticket-service` — o raciocínio completo está no [ADR-004](docs/decisions/ADR-004-employees-service.md).
+Segui a sugestão do próprio enunciado de não construir um cadastro completo: o `employees-service` sobe com 3 responsáveis fixos (`GET /employees` lista os disponíveis). Optei por fazer disso um serviço de verdade, com seu próprio banco, em vez de uma lista estática dentro do `ticket-service`, porque funcionários são outro domínio, com outro motivo de mudança.
 
 ### 4.0 — Distribuição automática
 
@@ -130,14 +132,12 @@ O desafio pede pra eu documentar isso quando cortar escopo por tempo, então que
 
 - **Não implementei o frontend.** O enunciado pede uma aplicação web com telas de cadastro, edição, listagem e seleção de responsável — eu só entreguei a API que sustentaria essas telas. Prioricei aprofundar a modelagem de domínio, os testes e a arquitetura de comunicação entre os serviços, e não sobrou tempo pra construir a interface nesta entrega. Se eu fosse continuar, o próximo passo seria um front em Vue (consistente com a stack que a Codificar usa) consumindo a API já pronta — os endpoints já retornam tudo que uma tela de listagem/edição precisaria.
 - **Não implementei autenticação/autorização** em nenhuma rota — qualquer requisição é aceita. Fora de escopo pra essa entrega, mas seria bloqueador antes de qualquer uso real.
-- **`ticket-service` não tem uma projeção de leitura dedicada** — a listagem e a distribuição automática reidratam os chamados a partir dos eventos a cada chamada. Funciona bem no volume de um desafio técnico, mas eu não deixaria assim em produção com um volume real de chamados (detalhei a solução que eu faria — uma projeção própria — no [ADR-003](docs/decisions/ADR-003-ticket-service.md)).
+- **`ticket-service` não tem uma projeção de leitura dedicada** — a listagem e a distribuição automática reidratam os chamados a partir dos eventos a cada chamada. Funciona bem no volume de um desafio técnico, mas eu não deixaria assim em produção com um volume real de chamados. A solução que eu faria é uma projeção de leitura própria, atualizada a partir dos eventos, consumida pelos casos de uso em `application/query/`.
 - **O cache de chamados é em memória e local a cada instância** do `ticket-service` — funciona rodando uma única instância (como faço aqui), mas não seria seguro com múltiplas réplicas sem trocar por um cache compartilhado.
-
-Fui mais detalhista sobre essas e outras decisões (incluindo antipadrões que assumi de propósito) nos ADRs de cada serviço, linkados acima.
 
 ## Testes
 
-Rodo os testes unitários (sem nenhuma dependência externa) com:
+Rodo os testes unitários e os testes de arquitetura (sem nenhuma dependência externa) com:
 
 ```bash
 make test
@@ -148,16 +148,16 @@ Os testes de integração contra Postgres real ficam atrás de uma variável de 
 ```bash
 # ticket-service
 TICKET_SERVICE_TEST_DATABASE_URL="postgres://ticket_service:ticket_service@localhost:5433/ticket_service?sslmode=disable" \
-  go test ./services/ticket-service/internal/infra/postgres/...
+  go test ./services/ticket-service/internal/adapters/out/postgres/...
 
 # employees-service
 EMPLOYEES_SERVICE_TEST_DATABASE_URL="postgres://employees_service:employees_service@localhost:5434/employees_service?sslmode=disable" \
-  go test ./services/employees-service/internal/infra/postgres/...
+  go test ./services/employees-service/internal/adapters/out/postgres/...
 ```
 
 ## CI/CD
 
-Configurei um pipeline em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) que roda em todo push/PR: build, `go vet`, testes com `-race` e checagem de `go.mod`/`go.sum` pra cada serviço; build das duas imagens Docker; e um smoke test que sobe a stack inteira via `docker compose` e exercita o fluxo real (abrir chamado → distribuir automaticamente → listar), validando que a integração assíncrona entre os serviços funciona de verdade, não só nos testes unitários com fakes. Deixei o [`dependabot.yml`](.github/dependabot.yml) configurado pra manter as dependências Go, as imagens Docker e as próprias GitHub Actions atualizadas. Detalhei as decisões dessa configuração no [ADR-006](docs/decisions/ADR-006-ci-e-dependabot.md).
+Configurei um pipeline em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) que roda em todo push/PR: build, `go vet`, testes com `-race` e checagem de `go.mod`/`go.sum` pra cada serviço; build das duas imagens Docker; e um smoke test que sobe a stack inteira via `docker compose` e exercita o fluxo real (abrir chamado → distribuir automaticamente → listar), validando que a integração assíncrona entre os serviços funciona de verdade, não só nos testes unitários com fakes. Deixei o [`dependabot.yml`](.github/dependabot.yml) configurado pra manter as dependências Go, as imagens Docker e as próprias GitHub Actions atualizadas.
 
 ## Referência de API
 
@@ -188,13 +188,18 @@ Configurei um pipeline em [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
 ```
 services/<serviço>/
-  cmd/server/main.go     # composição: monta as dependências e sobe o servidor HTTP
+  cmd/server/main.go        # composição: monta adaptadores e casos de uso e sobe o servidor
   internal/
-    domain/               # entidades, value objects, eventos, interfaces de repositório
-    application/          # um use case por ação, dependendo só de interfaces do domínio
-    infra/                # implementações concretas (Postgres, HTTP, Kafka, cache)
-docs/decisions/           # ADRs
-.github/                  # CI e Dependabot
+    domain/                 # agregados, value objects, eventos e erros de domínio
+    application/
+      port/out/             # portas de saída: interfaces que os casos de uso usam
+      command/  query/      # (ticket-service) casos de uso de escrita e de leitura
+      *.go                  # (employees-service) casos de uso
+    adapters/
+      in/                   # HTTP, consumer Kafka, relay do outbox
+      out/                  # Postgres (+ migrations), cache, publisher Kafka
+    architecture_test.go    # garante a regra de dependência entre as camadas
+.github/                    # CI e Dependabot
 docker-compose.yml
 makefile
 ```
