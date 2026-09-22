@@ -98,6 +98,24 @@ func TestTicketLifecycle(t *testing.T) {
 	assert.Equal(t, "Closed", got.Status)
 }
 
+func TestListTickets(t *testing.T) {
+	router := newTestRouter()
+
+	w := doRequest(t, router, http.MethodPost, "/tickets", map[string]string{
+		"title":       "Valid Title",
+		"description": "Valid Description",
+	})
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	w = doRequest(t, router, http.MethodGet, "/tickets", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var tickets []application.GetTicketOutput
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &tickets))
+	require.Len(t, tickets, 1)
+	assert.Equal(t, "Valid Title", tickets[0].Title)
+}
+
 func TestTicketErrors(t *testing.T) {
 	t.Run("should return 400 for an invalid title", func(t *testing.T) {
 		router := newTestRouter()

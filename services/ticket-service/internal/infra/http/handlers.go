@@ -36,6 +36,16 @@ func (h *Handler) OpenTicket(c *gin.Context) {
 	c.JSON(http.StatusCreated, output)
 }
 
+func (h *Handler) ListTickets(c *gin.Context) {
+	output, err := h.listTickets.Execute(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, output)
+}
+
 func (h *Handler) GetTicket(c *gin.Context) {
 	output, err := h.getTicket.Execute(c.Request.Context(), application.GetTicketInput{
 		TicketID: c.Param("id"),

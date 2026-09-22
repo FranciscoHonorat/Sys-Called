@@ -8,6 +8,7 @@ import (
 type Handler struct {
 	openTicket             *application.OpenTicketUseCase
 	getTicket              *application.GetTicketUseCase
+	listTickets            *application.ListTicketsUseCase
 	assignTicket           *application.AssignTicketUseCase
 	changeTicketPriority   *application.ChangeTicketPriorityUseCase
 	moveTicketToInProgress *application.MoveTicketToInProgressUseCase
@@ -19,6 +20,7 @@ func NewHandler(store repository.EventStore, cache repository.TicketCache) *Hand
 	return &Handler{
 		openTicket:             application.NewOpenTicketUseCase(store, cache),
 		getTicket:              application.NewGetTicketUseCase(store, cache),
+		listTickets:            application.NewListTicketsUseCase(store, cache),
 		assignTicket:           application.NewAssignTicketUseCase(store, cache),
 		changeTicketPriority:   application.NewChangeTicketPriorityUseCase(store, cache),
 		moveTicketToInProgress: application.NewMoveTicketToInProgressUseCase(store, cache),
