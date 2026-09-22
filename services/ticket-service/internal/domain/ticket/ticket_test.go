@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/event"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/response"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
@@ -65,6 +66,8 @@ func TestTicket(t *testing.T) {
 		assert.Equal(t, assignee, tk.GetAssigneeID())
 		assert.Equal(t, priority, tk.GetPriority())
 		assert.WithinDuration(t, time.Now(), tk.GetCreatedAt(), time.Second)
+		assert.Len(t, tk.GetUncommittedEvents(), 1)
+		assert.Equal(t, "TicketOpened", tk.GetUncommittedEvents()[0].EventName())
 	})
 
 	t.Run("should create a new Ticket without an assignee or priority", func(t *testing.T) {
@@ -245,6 +248,8 @@ func TestTicket(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, &newAssignee, tk.GetAssigneeID())
+		events := tk.GetUncommittedEvents()
+		assert.Equal(t, "TicketAssigned", events[len(events)-1].EventName())
 	})
 
 	t.Run("should return an error when assigning a nil AssigneeID", func(t *testing.T) {
@@ -280,6 +285,8 @@ func TestTicket(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, &newPriority, tk.GetPriority())
+		events := tk.GetUncommittedEvents()
+		assert.Equal(t, "TicketPriorityChanged", events[len(events)-1].EventName())
 	})
 
 	t.Run("should return an error when changing to a nil Priority", func(t *testing.T) {
@@ -312,6 +319,8 @@ func TestTicket(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, valueobjects.TicketStatusInProgress, tk.GetStatus())
+		events := tk.GetUncommittedEvents()
+		assert.Equal(t, "TicketMovedToInProgress", events[len(events)-1].EventName())
 	})
 
 	t.Run("should return an error when moving a non-open Ticket to in progress", func(t *testing.T) {
@@ -334,6 +343,8 @@ func TestTicket(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, valueobjects.TicketStatusClosed, tk.GetStatus())
+		events := tk.GetUncommittedEvents()
+		assert.Equal(t, "TicketClosed", events[len(events)-1].EventName())
 	})
 
 	t.Run("should close a Ticket that is in progress", func(t *testing.T) {
@@ -370,6 +381,19 @@ func TestTicket(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, []*response.Response{r}, tk.GetResponses())
+		events := tk.GetUncommittedEvents()
+		assert.Equal(t, "TicketResponseAdded", events[len(events)-1].EventName())
+	})
+
+	t.Run("should clear the uncommitted events", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, tk.GetUncommittedEvents())
+
+		tk.ClearUncommittedEvents()
+
+		assert.Empty(t, tk.GetUncommittedEvents())
 	})
 
 	t.Run("should return an error when adding a nil response", func(t *testing.T) {
@@ -406,5 +430,81 @@ func TestTicket(t *testing.T) {
 		err = tk.AddResponse(r)
 
 		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
+	})
+
+	t.Run("should reconstruct a Ticket from its event history", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		opened := event.NewTicketOpened(id, title, description, status, assignee, priority)
+
+		newAssignee, err := valueobjects.NewAssigneeID("agent-2")
+		assert.NoError(t, err)
+		assigned := event.NewTicketAssigned(id, &newAssignee)
+
+		newPriority, err := valueobjects.NewPriority(string(valueobjects.TicketPriorityLow))
+		assert.NoError(t, err)
+		priorityChanged := event.NewTicketPriorityChanged(id, &newPriority)
+
+		movedToInProgress := event.NewTicketMovedToInProgress(id)
+
+		r := validResponseFor(t, id)
+		responseAdded := event.NewTicketResponseAdded(id, r)
+
+		history := []event.Event{opened, assigned, priorityChanged, movedToInProgress, responseAdded}
+
+		tk, err := ticket.LoadFromHistory(history)
+
+		assert.NoError(t, err)
+		assert.Equal(t, id.GetID(), tk.GetID().GetID())
+		assert.Equal(t, title.GetTitle(), tk.GetTitle().GetTitle())
+		assert.Equal(t, description.GetDescription(), tk.GetDescription().GetDescription())
+		assert.Equal(t, valueobjects.TicketStatusInProgress, tk.GetStatus())
+		assert.Equal(t, "agent-2", tk.GetAssigneeID().GetAssigneeID())
+		assert.Equal(t, string(valueobjects.TicketPriorityLow), tk.GetPriority().GetPriority())
+		assert.Len(t, tk.GetResponses(), 1)
+		assert.Equal(t, r.GetContent().GetContent(), tk.GetResponses()[0].GetContent().GetContent())
+		assert.Empty(t, tk.GetUncommittedEvents())
+	})
+
+	t.Run("should reconstruct a closed Ticket from its event history", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		history := []event.Event{
+			event.NewTicketOpened(id, title, description, status, assignee, priority),
+			event.NewTicketClosed(id),
+		}
+
+		tk, err := ticket.LoadFromHistory(history)
+
+		assert.NoError(t, err)
+		assert.Equal(t, valueobjects.TicketStatusClosed, tk.GetStatus())
+	})
+
+	t.Run("should return an error when the event history is empty", func(t *testing.T) {
+		tk, err := ticket.LoadFromHistory(nil)
+
+		assert.Nil(t, tk)
+		assert.ErrorIs(t, err, domainErr.ErrEmptyEventHistory)
+	})
+
+	t.Run("should return an error when the first event is not TicketOpened", func(t *testing.T) {
+		id, _, _, _, _, _ := validTicketParts(t)
+		history := []event.Event{event.NewTicketClosed(id)}
+
+		tk, err := ticket.LoadFromHistory(history)
+
+		assert.Nil(t, tk)
+		assert.ErrorIs(t, err, domainErr.ErrInvalidEventHistory)
+	})
+
+	t.Run("should return an error when an event in the history has an invalid payload", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		history := []event.Event{
+			event.NewTicketOpened(id, title, description, status, assignee, priority),
+			event.NewTicketAssigned(id, &valueobjects.AssigneeID{}),
+		}
+
+		tk, err := ticket.LoadFromHistory(history)
+
+		assert.Nil(t, tk)
+		assert.ErrorIs(t, err, domainErr.ErrInvalidAssignee)
 	})
 }

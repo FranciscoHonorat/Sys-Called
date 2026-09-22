@@ -20,4 +20,10 @@ var (
 
 	ErrInvalidResponse        = errors.New("invalid response: response cannot be nil")
 	ErrResponseTicketMismatch = errors.New("invalid response: response does not belong to this ticket")
+
+	ErrEmptyEventHistory   = errors.New("invalid history: event history cannot be empty")
+	ErrInvalidEventHistory = errors.New("invalid history: first event must be TicketOpened")
+
+	ErrEventStreamNotFound = errors.New("event stream not found for aggregate")
+	ErrConcurrencyConflict = errors.New("concurrency conflict: aggregate was modified by another operation")
 )
