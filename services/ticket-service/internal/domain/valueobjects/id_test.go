@@ -34,27 +34,4 @@ func TestID(t *testing.T) {
 		assert.False(t, id1.Equals(id3))
 	})
 
-	t.Run("should marshal and unmarshal ID to/from JSON", func(t *testing.T) {
-		uuidValue := uuid.New()
-		idObj := id.NewID(uuidValue)
-
-		jsonData, err := idObj.MarshalJSON()
-		assert.NoError(t, err)
-
-		var unmarshaledID id.ID
-		err = unmarshaledID.UnmarshalJSON(jsonData)
-		assert.NoError(t, err)
-
-		assert.Equal(t, idObj.GetID(), unmarshaledID.GetID())
-	})
-
-	t.Run("should handle unmarshaling of nil UUID", func(t *testing.T) {
-		jsonData := []byte(`{"id":"00000000-0000-0000-0000-000000000000"}`)
-
-		var unmarshaledID id.ID
-		err := unmarshaledID.UnmarshalJSON(jsonData)
-		assert.NoError(t, err)
-
-		assert.Equal(t, uuid.Nil, unmarshaledID.GetID())
-	})
 }

@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 
-	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/domain/repository"
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/application/port/out"
 )
 
 type EmployeeOutput struct {
@@ -12,10 +12,10 @@ type EmployeeOutput struct {
 }
 
 type ListEmployeesUseCase struct {
-	repo repository.EmployeeRepository
+	repo out.EmployeeRepository
 }
 
-func NewListEmployeesUseCase(repo repository.EmployeeRepository) *ListEmployeesUseCase {
+func NewListEmployeesUseCase(repo out.EmployeeRepository) *ListEmployeesUseCase {
 	return &ListEmployeesUseCase{repo: repo}
 }
 

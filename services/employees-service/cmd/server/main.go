@@ -12,11 +12,11 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
+	httpapi "github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/in/http"
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/in/outbox"
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/out/messaging"
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/out/postgres"
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/application"
-	httpapi "github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/infra/http"
-	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/infra/messaging"
-	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/infra/outbox"
-	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/infra/postgres"
 )
 
 const outboxRelayInterval = time.Second
@@ -68,10 +68,10 @@ func main() {
 	}
 	defer writer.Close()
 
-	relay := outbox.NewRelay(postgres.NewOutboxStore(pool), messaging.NewKafkaPublisher(writer))
+	relay := outbox.NewRelay(application.NewPublishPendingEventsUseCase(postgres.NewOutboxStore(pool), messaging.NewKafkaPublisher(writer)))
 	go relay.Run(ctx, outboxRelayInterval)
 
-	handler := httpapi.NewHandler(repo)
+	handler := httpapi.NewHandler(application.NewListEmployeesUseCase(repo))
 	router := httpapi.NewRouter(handler)
 
 	srv := &http.Server{

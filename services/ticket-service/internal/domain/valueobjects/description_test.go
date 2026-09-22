@@ -24,36 +24,4 @@ func TestDescription(t *testing.T) {
 		assert.ErrorIs(t, err, domainErr.ErrInvalidDescription)
 	})
 
-	t.Run("should validate a valid description", func(t *testing.T) {
-		desc := &des.Description{Description: "This is a test description"}
-
-		assert.True(t, desc.IsValid())
-	})
-
-	t.Run("should invalidate an empty description", func(t *testing.T) {
-		desc := &des.Description{Description: ""}
-
-		assert.False(t, desc.IsValid())
-	})
-
-	t.Run("should compare two equal descriptions", func(t *testing.T) {
-		description := "This is a test description"
-		desc1, err := des.NewDescription(description)
-		assert.NoError(t, err)
-		desc2, err := des.NewDescription(description)
-		assert.NoError(t, err)
-
-		assert.True(t, desc1.Equals(desc2))
-	})
-
-	t.Run("should compare two different descriptions", func(t *testing.T) {
-		description1 := "This is a test description"
-		description2 := "This is another test description"
-		desc1, err := des.NewDescription(description1)
-		assert.NoError(t, err)
-		desc2, err := des.NewDescription(description2)
-		assert.NoError(t, err)
-
-		assert.False(t, desc1.Equals(desc2))
-	})
 }

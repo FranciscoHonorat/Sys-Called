@@ -1,8 +1,6 @@
 package valueobjects
 
 import (
-	"encoding/json"
-
 	"github.com/google/uuid"
 )
 
@@ -30,28 +28,4 @@ func (id *ID) Equals(other *ID) bool {
 		return false
 	}
 	return id.ID == other.ID
-}
-
-func (id *ID) MarshalJSON() ([]byte, error) {
-	auxID := struct {
-		ID string `json:"id"`
-	}{
-		ID: id.ID.String(),
-	}
-	return json.Marshal(auxID)
-}
-
-func (id *ID) UnmarshalJSON(data []byte) error {
-	var auxID struct {
-		ID uuid.UUID
-	}
-	if err := json.Unmarshal(data, &auxID); err != nil {
-		return err
-	}
-	if auxID.ID == uuid.Nil {
-		id.ID = uuid.Nil
-		return nil
-	}
-	id.ID = auxID.ID
-	return nil
 }

@@ -1,8 +1,6 @@
 package event
 
 import (
-	"encoding/json"
-
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/response"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 )
@@ -16,7 +14,7 @@ type TicketResponseAdded struct {
 
 func NewTicketResponseAdded(id *valueobjects.ID, r *response.Response) TicketResponseAdded {
 	return TicketResponseAdded{
-		baseEvent:  newBaseEvent(id.GetID()),
+		baseEvent:  baseEvent{aggregateID: id.GetID(), occurredAt: r.GetCreatedAt()},
 		ResponseID: r.GetID().String(),
 		AuthorID:   r.GetAuthorID().GetAuthorID(),
 		Content:    r.GetContent().GetContent(),
@@ -28,12 +26,5 @@ func (TicketResponseAdded) EventName() string {
 }
 
 func init() {
-	registerEvent(TicketResponseAdded{}.EventName(), func(payload []byte, base baseEvent) (Event, error) {
-		var e TicketResponseAdded
-		if err := json.Unmarshal(payload, &e); err != nil {
-			return nil, err
-		}
-		e.baseEvent = base
-		return e, nil
-	})
+	registerEvent[TicketResponseAdded]()
 }

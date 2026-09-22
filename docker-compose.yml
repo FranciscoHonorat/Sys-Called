@@ -21,7 +21,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./services/ticket-service/internal/infra/postgres/migrations:/migrations:ro
+      - ./services/ticket-service/internal/adapters/out/postgres/migrations:/migrations:ro
     environment:
       DATABASE_URL: postgres://ticket_service:ticket_service@postgres:5432/ticket_service?sslmode=disable
     entrypoint: ["sh", "-c", "for f in /migrations/*.sql; do echo \"applying $$f\"; psql \"$$DATABASE_URL\" -f \"$$f\" || exit 1; done"]
@@ -48,7 +48,7 @@ services:
       employees-postgres:
         condition: service_healthy
     volumes:
-      - ./services/employees-service/internal/infra/postgres/migrations:/migrations:ro
+      - ./services/employees-service/internal/adapters/out/postgres/migrations:/migrations:ro
     environment:
       DATABASE_URL: postgres://employees_service:employees_service@employees-postgres:5432/employees_service?sslmode=disable
     entrypoint: ["sh", "-c", "for f in /migrations/*.sql; do echo \"applying $$f\"; psql \"$$DATABASE_URL\" -f \"$$f\" || exit 1; done"]

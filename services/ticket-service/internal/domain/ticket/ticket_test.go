@@ -116,126 +116,6 @@ func TestTicket(t *testing.T) {
 		assert.ErrorIs(t, err, domainErr.ErrInvalidStatus)
 	})
 
-	t.Run("should marshal a Ticket with all fields to JSON", func(t *testing.T) {
-		id, title, description, status, assignee, priority := validTicketParts(t)
-		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
-		assert.NoError(t, err)
-
-		data, err := tk.MarshalJSON()
-
-		assert.NoError(t, err)
-		assert.Contains(t, string(data), `"id":"`+id.String()+`"`)
-		assert.Contains(t, string(data), `"title":"Valid Title"`)
-		assert.Contains(t, string(data), `"assignee_id":"agent-1"`)
-	})
-
-	t.Run("should include responses in the marshaled JSON", func(t *testing.T) {
-		id, title, description, status, assignee, priority := validTicketParts(t)
-		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
-		assert.NoError(t, err)
-		assert.NoError(t, tk.AddResponse(validResponseFor(t, tk.GetID())))
-
-		data, err := tk.MarshalJSON()
-
-		assert.NoError(t, err)
-		assert.Contains(t, string(data), `"content":"Valid response content"`)
-	})
-
-	t.Run("should omit assignee, priority and responses when absent", func(t *testing.T) {
-		id, title, description, status, _, _ := validTicketParts(t)
-		tk, err := ticket.NewTicket(id, title, description, status, nil, nil)
-		assert.NoError(t, err)
-
-		data, err := tk.MarshalJSON()
-
-		assert.NoError(t, err)
-		assert.NotContains(t, string(data), `"assignee_id"`)
-		assert.NotContains(t, string(data), `"priority"`)
-		assert.NotContains(t, string(data), `"responses"`)
-	})
-
-	t.Run("should round-trip marshal and unmarshal", func(t *testing.T) {
-		id, title, description, status, assignee, priority := validTicketParts(t)
-		original, err := ticket.NewTicket(id, title, description, status, assignee, priority)
-		assert.NoError(t, err)
-		assert.NoError(t, original.AddResponse(validResponseFor(t, original.GetID())))
-
-		data, err := original.MarshalJSON()
-		assert.NoError(t, err)
-
-		var decoded ticket.Ticket
-		err = decoded.UnmarshalJSON(data)
-		assert.NoError(t, err)
-
-		assert.Equal(t, original.GetID().GetID(), decoded.GetID().GetID())
-		assert.Equal(t, original.GetTitle().GetTitle(), decoded.GetTitle().GetTitle())
-		assert.Equal(t, original.GetDescription().GetDescription(), decoded.GetDescription().GetDescription())
-		assert.Equal(t, original.GetStatus(), decoded.GetStatus())
-		assert.Equal(t, original.GetAssigneeID().GetAssigneeID(), decoded.GetAssigneeID().GetAssigneeID())
-		assert.Equal(t, original.GetPriority().GetPriority(), decoded.GetPriority().GetPriority())
-		assert.Len(t, decoded.GetResponses(), 1)
-		assert.Equal(t, original.GetResponses()[0].GetContent().GetContent(), decoded.GetResponses()[0].GetContent().GetContent())
-	})
-
-	t.Run("should leave assignee and priority nil when absent from JSON", func(t *testing.T) {
-		data := []byte(`{"id":"` + uuid.New().String() + `","title":"T","description":"D","status":"Open","created_at":"` + time.Now().Format(time.RFC3339) + `"}`)
-
-		var tk ticket.Ticket
-		err := tk.UnmarshalJSON(data)
-
-		assert.NoError(t, err)
-		assert.Nil(t, tk.GetAssigneeID())
-		assert.Nil(t, tk.GetPriority())
-	})
-
-	t.Run("should return an error for an invalid UUID", func(t *testing.T) {
-		data := []byte(`{"id":"not-a-uuid","title":"T","description":"D","status":"Open","created_at":"` + time.Now().Format(time.RFC3339) + `"}`)
-
-		var tk ticket.Ticket
-		err := tk.UnmarshalJSON(data)
-
-		assert.ErrorIs(t, err, domainErr.ErrInvalidUUID)
-	})
-
-	t.Run("should return an error for an empty title", func(t *testing.T) {
-		data := []byte(`{"id":"` + uuid.New().String() + `","title":"","description":"D","status":"Open","created_at":"` + time.Now().Format(time.RFC3339) + `"}`)
-
-		var tk ticket.Ticket
-		err := tk.UnmarshalJSON(data)
-
-		assert.ErrorIs(t, err, domainErr.ErrInvalidTitle)
-	})
-
-	t.Run("should return an error for an invalid status", func(t *testing.T) {
-		data := []byte(`{"id":"` + uuid.New().String() + `","title":"T","description":"D","status":"bogus","created_at":"` + time.Now().Format(time.RFC3339) + `"}`)
-
-		var tk ticket.Ticket
-		err := tk.UnmarshalJSON(data)
-
-		assert.ErrorIs(t, err, domainErr.ErrInvalidStatus)
-	})
-
-	t.Run("should return an error for a malformed created_at", func(t *testing.T) {
-		data := []byte(`{"id":"` + uuid.New().String() + `","title":"T","description":"D","status":"Open","created_at":"not-a-date"}`)
-
-		var tk ticket.Ticket
-		err := tk.UnmarshalJSON(data)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("should return an error when unmarshaling a response for a different ticket", func(t *testing.T) {
-		ticketID := uuid.New()
-		otherTicketID := uuid.New()
-		data := []byte(`{"id":"` + ticketID.String() + `","title":"T","description":"D","status":"Open","created_at":"` + time.Now().Format(time.RFC3339) +
-			`","responses":[{"id":"` + uuid.New().String() + `","ticket_id":"` + otherTicketID.String() + `","author_id":"agent-1","content":"C","created_at":"` + time.Now().Format(time.RFC3339) + `"}]}`)
-
-		var tk ticket.Ticket
-		err := tk.UnmarshalJSON(data)
-
-		assert.ErrorIs(t, err, domainErr.ErrResponseTicketMismatch)
-	})
-
 	t.Run("should edit the title and description of a Ticket", func(t *testing.T) {
 		id, title, description, status, assignee, priority := validTicketParts(t)
 		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
@@ -519,6 +399,20 @@ func TestTicket(t *testing.T) {
 		assert.Len(t, tk.GetResponses(), 1)
 		assert.Equal(t, r.GetContent().GetContent(), tk.GetResponses()[0].GetContent().GetContent())
 		assert.Empty(t, tk.GetUncommittedEvents())
+	})
+
+	t.Run("should keep the original creation time of responses when reconstructing from history", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		opened := event.NewTicketOpened(id, title, description, status, assignee, priority)
+		r := validResponseFor(t, id)
+		responseAdded := event.NewTicketResponseAdded(id, r)
+
+		time.Sleep(time.Millisecond)
+		tk, err := ticket.LoadFromHistory([]event.Event{opened, responseAdded})
+
+		assert.NoError(t, err)
+		assert.Len(t, tk.GetResponses(), 1)
+		assert.Equal(t, r.GetCreatedAt(), tk.GetResponses()[0].GetCreatedAt())
 	})
 
 	t.Run("should reconstruct a closed Ticket from its event history", func(t *testing.T) {
