@@ -2,7 +2,8 @@ package valueobjects
 
 import (
 	"encoding/json"
-	"fmt"
+
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 )
 
 type Status string
@@ -12,6 +13,10 @@ const (
 	TicketStatusInProgress Status = "In Progress"
 	TicketStatusClosed     Status = "Closed"
 )
+
+func NewStatus(status string) Status {
+	return Status(status)
+}
 
 func (s Status) IsValid() bool {
 	switch s {
@@ -41,7 +46,7 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 	}
 	ticketStatus := Status(status)
 	if !ticketStatus.IsValid() {
-		return fmt.Errorf("invalid status: %s", status)
+		return domainErr.ErrInvalidStatus
 	}
 	*s = ticketStatus
 	return nil
