@@ -2,7 +2,6 @@ package valueobjects
 
 import (
 	"encoding/json"
-	"reflect"
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 )
@@ -11,8 +10,12 @@ type AssigneeID struct {
 	id string
 }
 
-func NewAssigneeID(id string) AssigneeID {
-	return AssigneeID{id: id}
+func NewAssigneeID(id string) (AssigneeID, error) {
+	assignee := AssigneeID{id: id}
+	if !assignee.IsValid() {
+		return AssigneeID{}, domainErr.ErrInvalidAssignee
+	}
+	return assignee, nil
 }
 
 func (a AssigneeID) GetAssigneeID() string {
@@ -28,13 +31,18 @@ func (a AssigneeID) Equals(other AssigneeID) bool {
 }
 
 func (a AssigneeID) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + a.id + `"`), nil
+	return json.Marshal(a.id)
 }
 
 func (a *AssigneeID) UnmarshalJSON(data []byte) error {
-	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
-		return &json.UnmarshalTypeError{Value: string(data), Type: reflect.TypeOf(a)}
+	var id string
+	if err := json.Unmarshal(data, &id); err != nil {
+		return err
 	}
-	a.id = string(data[1 : len(data)-1])
-	return domainErr.ErrInvalidAssignee
+	assignee := AssigneeID{id: id}
+	if !assignee.IsValid() {
+		return domainErr.ErrInvalidAssignee
+	}
+	*a = assignee
+	return nil
 }

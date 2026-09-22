@@ -14,8 +14,12 @@ const (
 	TicketPriorityHigh   Priority = "High"
 )
 
-func NewPriority(priority string) Priority {
-	return Priority(priority)
+func NewPriority(priority string) (Priority, error) {
+	ticketPriority := Priority(priority)
+	if !ticketPriority.IsValid() {
+		return "", domainErr.ErrInvalidPriority
+	}
+	return ticketPriority, nil
 }
 
 func (p Priority) IsValid() bool {

@@ -2,14 +2,20 @@ package valueobjects
 
 import (
 	"encoding/json"
+
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 )
 
 type Title struct {
 	Title string
 }
 
-func NewTitle(title string) *Title {
-	return &Title{Title: title}
+func NewTitle(title string) (*Title, error) {
+	t := &Title{Title: title}
+	if !t.IsValid() {
+		return nil, domainErr.ErrInvalidTitle
+	}
+	return t, nil
 }
 
 func (t *Title) GetTitle() string {

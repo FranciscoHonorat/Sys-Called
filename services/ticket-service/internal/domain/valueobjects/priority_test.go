@@ -12,9 +12,17 @@ import (
 func TestPriority(t *testing.T) {
 	t.Run("should create a new Priority with a valid string", func(t *testing.T) {
 		priorityStr := "High"
-		priorityObj := priority.NewPriority(priorityStr)
+		priorityObj, err := priority.NewPriority(priorityStr)
 
+		assert.NoError(t, err)
 		assert.Equal(t, priorityStr, priorityObj.GetPriority())
+	})
+
+	t.Run("should return an error when creating a Priority with an invalid string", func(t *testing.T) {
+		_, err := priority.NewPriority("Invalid")
+
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, domainErr.ErrInvalidPriority)
 	})
 
 	t.Run("should check validity of Priority", func(t *testing.T) {
@@ -36,7 +44,8 @@ func TestPriority(t *testing.T) {
 
 	t.Run("should marshal and unmarshal Priority to/from JSON", func(t *testing.T) {
 		priorityStr := "Medium"
-		priorityObj := priority.NewPriority(priorityStr)
+		priorityObj, err := priority.NewPriority(priorityStr)
+		assert.NoError(t, err)
 
 		jsonData, err := priorityObj.MarshalJSON()
 		assert.NoError(t, err)

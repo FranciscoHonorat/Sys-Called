@@ -1,13 +1,21 @@
 package valueobjects
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
+)
 
 type Description struct {
 	Description string
 }
 
-func NewDescription(description string) *Description {
-	return &Description{Description: description}
+func NewDescription(description string) (*Description, error) {
+	d := &Description{Description: description}
+	if !d.IsValid() {
+		return nil, domainErr.ErrInvalidDescription
+	}
+	return d, nil
 }
 
 func (d *Description) GetDescription() string {
