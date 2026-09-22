@@ -99,4 +99,24 @@ func TestEventStore(t *testing.T) {
 		_, err := store.Load(context.Background(), uuid.New())
 		assert.ErrorIs(t, err, domainErr.ErrEventStreamNotFound)
 	})
+
+	t.Run("should list the aggregate IDs of opened tickets", func(t *testing.T) {
+		title, err := valueobjects.NewTitle("Valid Title")
+		require.NoError(t, err)
+		description, err := valueobjects.NewDescription("Valid Description")
+		require.NoError(t, err)
+
+		id1 := valueobjects.NewID(uuid.New())
+		opened1 := event.NewTicketOpened(id1, title, description, valueobjects.TicketStatusOpen, nil, nil)
+		require.NoError(t, store.Append(context.Background(), id1.GetID(), []event.Event{opened1}, 0))
+
+		id2 := valueobjects.NewID(uuid.New())
+		opened2 := event.NewTicketOpened(id2, title, description, valueobjects.TicketStatusOpen, nil, nil)
+		require.NoError(t, store.Append(context.Background(), id2.GetID(), []event.Event{opened2}, 0))
+
+		ids, err := store.ListAggregateIDs(context.Background())
+		assert.NoError(t, err)
+		assert.Contains(t, ids, id1.GetID())
+		assert.Contains(t, ids, id2.GetID())
+	})
 }

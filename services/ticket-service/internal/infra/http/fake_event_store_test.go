@@ -11,6 +11,7 @@ import (
 
 type fakeEventStore struct {
 	streams map[uuid.UUID][]event.Event
+	order   []uuid.UUID
 }
 
 func newFakeEventStore() *fakeEventStore {
@@ -22,6 +23,9 @@ func (s *fakeEventStore) Append(_ context.Context, aggregateID uuid.UUID, events
 	if len(current) != expectedVersion {
 		return domainErr.ErrConcurrencyConflict
 	}
+	if len(current) == 0 {
+		s.order = append(s.order, aggregateID)
+	}
 	s.streams[aggregateID] = append(current, events...)
 	return nil
 }
@@ -32,4 +36,18 @@ func (s *fakeEventStore) Load(_ context.Context, aggregateID uuid.UUID) ([]event
 		return nil, domainErr.ErrEventStreamNotFound
 	}
 	return events, nil
+}
+
+func (s *fakeEventStore) ListAggregateIDs(_ context.Context) ([]uuid.UUID, error) {
+	ids := make([]uuid.UUID, len(s.order))
+	copy(ids, s.order)
+	return ids, nil
+}
+
+type fakeResponsibleDirectory struct {
+	responsibles []string
+}
+
+func (d *fakeResponsibleDirectory) List(_ context.Context) ([]string, error) {
+	return d.responsibles, nil
 }

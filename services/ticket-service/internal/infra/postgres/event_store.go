@@ -101,3 +101,27 @@ func (s *EventStore) Load(ctx context.Context, aggregateID uuid.UUID) ([]event.E
 
 	return events, nil
 }
+
+func (s *EventStore) ListAggregateIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT aggregate_id FROM ticket_events WHERE version = 1 ORDER BY occurred_at ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}

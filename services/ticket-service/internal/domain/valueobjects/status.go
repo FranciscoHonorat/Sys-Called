@@ -19,12 +19,7 @@ func NewStatus(status string) Status {
 }
 
 func (s Status) IsValid() bool {
-	switch s {
-	case TicketStatusOpen, TicketStatusInProgress, TicketStatusClosed:
-		return true
-	default:
-		return false
-	}
+	return isOneOf(s, TicketStatusOpen, TicketStatusInProgress, TicketStatusClosed)
 }
 
 func (s Status) Equals(other Status) bool {

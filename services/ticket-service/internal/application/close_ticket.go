@@ -7,7 +7,6 @@ import (
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/repository"
-	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 )
 
 type CloseTicketInput struct {
@@ -15,12 +14,11 @@ type CloseTicketInput struct {
 }
 
 type CloseTicketUseCase struct {
-	store repository.EventStore
-	cache repository.TicketCache
+	eventSourcedUseCase
 }
 
 func NewCloseTicketUseCase(store repository.EventStore, cache repository.TicketCache) *CloseTicketUseCase {
-	return &CloseTicketUseCase{store: store, cache: cache}
+	return &CloseTicketUseCase{eventSourcedUseCase{store: store, cache: cache}}
 }
 
 func (uc *CloseTicketUseCase) Execute(ctx context.Context, input CloseTicketInput) error {
@@ -29,12 +27,7 @@ func (uc *CloseTicketUseCase) Execute(ctx context.Context, input CloseTicketInpu
 		return domainErr.ErrInvalidUUID
 	}
 
-	history, err := uc.store.Load(ctx, ticketID)
-	if err != nil {
-		return err
-	}
-
-	t, err := ticket.LoadFromHistory(history)
+	t, version, err := uc.loadTicket(ctx, ticketID)
 	if err != nil {
 		return err
 	}
@@ -43,11 +36,5 @@ func (uc *CloseTicketUseCase) Execute(ctx context.Context, input CloseTicketInpu
 		return err
 	}
 
-	if err := uc.store.Append(ctx, ticketID, t.GetUncommittedEvents(), len(history)); err != nil {
-		return err
-	}
-	t.ClearUncommittedEvents()
-	uc.cache.Set(ctx, t)
-
-	return nil
+	return uc.commit(ctx, t, ticketID, version)
 }

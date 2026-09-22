@@ -34,6 +34,8 @@ func statusForError(err error) int {
 		errors.Is(err, domainErr.ErrInvalidTicketID),
 		errors.Is(err, domainErr.ErrInvalidResponse):
 		return http.StatusBadRequest
+	case errors.Is(err, domainErr.ErrNoResponsiblesAvailable):
+		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
 	}

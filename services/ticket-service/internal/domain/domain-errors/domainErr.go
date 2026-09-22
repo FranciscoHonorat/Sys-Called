@@ -28,4 +28,6 @@ var (
 	ErrConcurrencyConflict = errors.New("concurrency conflict: aggregate was modified by another operation")
 
 	ErrUnknownEventType = errors.New("event: unknown event type")
+
+	ErrNoResponsiblesAvailable = errors.New("no responsibles available for automatic assignment")
 )

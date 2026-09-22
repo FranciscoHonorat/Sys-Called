@@ -151,6 +151,18 @@ func (t *Ticket) apply(e event.Event) error {
 			t.priority = &priority
 		}
 
+	case event.TicketEdited:
+		title, err := valueobjects.NewTitle(ev.Title)
+		if err != nil {
+			return err
+		}
+		description, err := valueobjects.NewDescription(ev.Description)
+		if err != nil {
+			return err
+		}
+		t.title = title
+		t.description = description
+
 	case event.TicketAssigned:
 		assigneeID, err := valueobjects.NewAssigneeID(ev.AssigneeID)
 		if err != nil {
@@ -206,6 +218,22 @@ func (t *Ticket) AddResponse(r *response.Response) error {
 	}
 	t.responses = append(t.responses, r)
 	t.raise(event.NewTicketResponseAdded(t.id, r))
+	return nil
+}
+
+func (t *Ticket) Edit(title *valueobjects.Title, description *valueobjects.Description) error {
+	if t.status == valueobjects.TicketStatusClosed {
+		return domainErr.ErrTicketAlreadyClosed
+	}
+	if title == nil {
+		return domainErr.ErrInvalidTitle
+	}
+	if description == nil {
+		return domainErr.ErrInvalidDescription
+	}
+	t.title = title
+	t.description = description
+	t.raise(event.NewTicketEdited(t.id, title, description))
 	return nil
 }
 

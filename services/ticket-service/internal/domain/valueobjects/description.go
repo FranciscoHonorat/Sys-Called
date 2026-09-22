@@ -1,8 +1,6 @@
 package valueobjects
 
 import (
-	"encoding/json"
-
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 )
 
@@ -11,11 +9,11 @@ type Description struct {
 }
 
 func NewDescription(description string) (*Description, error) {
-	d := &Description{Description: description}
-	if !d.IsValid() {
-		return nil, domainErr.ErrInvalidDescription
+	value, err := newNonEmptyString(description, domainErr.ErrInvalidDescription)
+	if err != nil {
+		return nil, err
 	}
-	return d, nil
+	return &Description{Description: value}, nil
 }
 
 func (d *Description) GetDescription() string {
@@ -34,14 +32,14 @@ func (d *Description) Equals(other *Description) bool {
 }
 
 func (d *Description) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Description)
+	return marshalNonEmptyString(d.Description)
 }
 
 func (d *Description) UnmarshalJSON(data []byte) error {
-	var description string
-	if err := json.Unmarshal(data, &description); err != nil {
+	value, err := unmarshalNonEmptyString(data, domainErr.ErrInvalidDescription)
+	if err != nil {
 		return err
 	}
-	d.Description = description
+	d.Description = value
 	return nil
 }

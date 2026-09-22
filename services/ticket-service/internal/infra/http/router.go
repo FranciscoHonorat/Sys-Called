@@ -15,8 +15,11 @@ func NewRouter(h *Handler) *gin.Engine {
 	})
 
 	r.POST("/tickets", h.OpenTicket)
+	r.GET("/tickets", h.ListTickets)
 	r.GET("/tickets/:id", h.GetTicket)
+	r.PUT("/tickets/:id", h.EditTicket)
 	r.POST("/tickets/:id/assign", h.AssignTicket)
+	r.POST("/tickets/:id/assign/auto", h.AutoAssignTicket)
 	r.POST("/tickets/:id/priority", h.ChangeTicketPriority)
 	r.POST("/tickets/:id/start", h.MoveTicketToInProgress)
 	r.POST("/tickets/:id/close", h.CloseTicket)

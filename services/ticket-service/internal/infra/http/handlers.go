@@ -36,6 +36,16 @@ func (h *Handler) OpenTicket(c *gin.Context) {
 	c.JSON(http.StatusCreated, output)
 }
 
+func (h *Handler) ListTickets(c *gin.Context) {
+	output, err := h.listTickets.Execute(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, output)
+}
+
 func (h *Handler) GetTicket(c *gin.Context) {
 	output, err := h.getTicket.Execute(c.Request.Context(), application.GetTicketInput{
 		TicketID: c.Param("id"),
@@ -46,6 +56,31 @@ func (h *Handler) GetTicket(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, output)
+}
+
+type editTicketRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+func (h *Handler) EditTicket(c *gin.Context) {
+	var body editTicketRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	err := h.editTicket.Execute(c.Request.Context(), application.EditTicketInput{
+		TicketID:    c.Param("id"),
+		Title:       body.Title,
+		Description: body.Description,
+	})
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 type assignTicketRequest struct {
@@ -69,6 +104,18 @@ func (h *Handler) AssignTicket(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) AutoAssignTicket(c *gin.Context) {
+	output, err := h.autoAssignTicket.Execute(c.Request.Context(), application.AutoAssignTicketInput{
+		TicketID: c.Param("id"),
+	})
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, output)
 }
 
 type changeTicketPriorityRequest struct {

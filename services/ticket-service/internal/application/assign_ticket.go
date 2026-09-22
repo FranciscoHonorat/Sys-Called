@@ -7,7 +7,6 @@ import (
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/repository"
-	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 )
 
@@ -17,12 +16,11 @@ type AssignTicketInput struct {
 }
 
 type AssignTicketUseCase struct {
-	store repository.EventStore
-	cache repository.TicketCache
+	eventSourcedUseCase
 }
 
 func NewAssignTicketUseCase(store repository.EventStore, cache repository.TicketCache) *AssignTicketUseCase {
-	return &AssignTicketUseCase{store: store, cache: cache}
+	return &AssignTicketUseCase{eventSourcedUseCase{store: store, cache: cache}}
 }
 
 func (uc *AssignTicketUseCase) Execute(ctx context.Context, input AssignTicketInput) error {
@@ -31,12 +29,7 @@ func (uc *AssignTicketUseCase) Execute(ctx context.Context, input AssignTicketIn
 		return domainErr.ErrInvalidUUID
 	}
 
-	history, err := uc.store.Load(ctx, ticketID)
-	if err != nil {
-		return err
-	}
-
-	t, err := ticket.LoadFromHistory(history)
+	t, version, err := uc.loadTicket(ctx, ticketID)
 	if err != nil {
 		return err
 	}
@@ -50,11 +43,5 @@ func (uc *AssignTicketUseCase) Execute(ctx context.Context, input AssignTicketIn
 		return err
 	}
 
-	if err := uc.store.Append(ctx, ticketID, t.GetUncommittedEvents(), len(history)); err != nil {
-		return err
-	}
-	t.ClearUncommittedEvents()
-	uc.cache.Set(ctx, t)
-
-	return nil
+	return uc.commit(ctx, t, ticketID, version)
 }

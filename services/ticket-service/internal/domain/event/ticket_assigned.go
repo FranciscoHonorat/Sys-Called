@@ -1,6 +1,10 @@
 package event
 
-import "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
+import (
+	"encoding/json"
+
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
+)
 
 type TicketAssigned struct {
 	baseEvent
@@ -16,4 +20,15 @@ func NewTicketAssigned(id *valueobjects.ID, assigneeID *valueobjects.AssigneeID)
 
 func (TicketAssigned) EventName() string {
 	return "TicketAssigned"
+}
+
+func init() {
+	registerEvent(TicketAssigned{}.EventName(), func(payload []byte, base baseEvent) (Event, error) {
+		var e TicketAssigned
+		if err := json.Unmarshal(payload, &e); err != nil {
+			return nil, err
+		}
+		e.baseEvent = base
+		return e, nil
+	})
 }
