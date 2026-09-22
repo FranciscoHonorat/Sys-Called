@@ -1,8 +1,6 @@
 package event
 
 import (
-	"encoding/json"
-
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 )
 
@@ -25,12 +23,5 @@ func (TicketEdited) EventName() string {
 }
 
 func init() {
-	registerEvent(TicketEdited{}.EventName(), func(payload []byte, base baseEvent) (Event, error) {
-		var e TicketEdited
-		if err := json.Unmarshal(payload, &e); err != nil {
-			return nil, err
-		}
-		e.baseEvent = base
-		return e, nil
-	})
+	registerEvent[TicketEdited]()
 }

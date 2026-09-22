@@ -5,16 +5,43 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/repository"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 )
 
-type eventSourcedUseCase struct {
-	store repository.EventStore
-	cache repository.TicketCache
+type EventSourcedUseCase struct {
+	store out.EventStore
+	cache out.TicketCache
 }
 
-func (uc eventSourcedUseCase) loadTicket(ctx context.Context, ticketID uuid.UUID) (*ticket.Ticket, int, error) {
+func NewEventSourcedUseCase(store out.EventStore, cache out.TicketCache) EventSourcedUseCase {
+	return EventSourcedUseCase{store: store, cache: cache}
+}
+
+func (uc EventSourcedUseCase) CreateTicket(ctx context.Context, t *ticket.Ticket) error {
+	return uc.commit(ctx, t, t.GetID().GetID(), 0)
+}
+
+func (uc EventSourcedUseCase) UpdateTicket(ctx context.Context, rawTicketID string, change func(t *ticket.Ticket) error) error {
+	ticketID, err := parseTicketID(rawTicketID)
+	if err != nil {
+		return err
+	}
+
+	t, version, err := uc.loadTicket(ctx, ticketID)
+	if err != nil {
+		return err
+	}
+
+	if err := change(t); err != nil {
+		return err
+	}
+
+	return uc.commit(ctx, t, ticketID, version)
+}
+
+func (uc EventSourcedUseCase) loadTicket(ctx context.Context, ticketID uuid.UUID) (*ticket.Ticket, int, error) {
 	history, err := uc.store.Load(ctx, ticketID)
 	if err != nil {
 		return nil, 0, err
@@ -28,7 +55,26 @@ func (uc eventSourcedUseCase) loadTicket(ctx context.Context, ticketID uuid.UUID
 	return t, len(history), nil
 }
 
-func (uc eventSourcedUseCase) loadAllTickets(ctx context.Context) ([]*ticket.Ticket, error) {
+func (uc EventSourcedUseCase) LoadCachedTicket(ctx context.Context, rawTicketID string) (*ticket.Ticket, error) {
+	ticketID, err := parseTicketID(rawTicketID)
+	if err != nil {
+		return nil, err
+	}
+
+	if t, ok := uc.cache.Get(ctx, ticketID); ok {
+		return t, nil
+	}
+
+	t, _, err := uc.loadTicket(ctx, ticketID)
+	if err != nil {
+		return nil, err
+	}
+
+	uc.cache.Set(ctx, t)
+	return t, nil
+}
+
+func (uc EventSourcedUseCase) LoadAllTickets(ctx context.Context) ([]*ticket.Ticket, error) {
 	ids, err := uc.store.ListAggregateIDs(ctx)
 	if err != nil {
 		return nil, err
@@ -46,11 +92,19 @@ func (uc eventSourcedUseCase) loadAllTickets(ctx context.Context) ([]*ticket.Tic
 	return tickets, nil
 }
 
-func (uc eventSourcedUseCase) commit(ctx context.Context, t *ticket.Ticket, ticketID uuid.UUID, expectedVersion int) error {
+func (uc EventSourcedUseCase) commit(ctx context.Context, t *ticket.Ticket, ticketID uuid.UUID, expectedVersion int) error {
 	if err := uc.store.Append(ctx, ticketID, t.GetUncommittedEvents(), expectedVersion); err != nil {
 		return err
 	}
 	t.ClearUncommittedEvents()
 	uc.cache.Set(ctx, t)
 	return nil
+}
+
+func parseTicketID(raw string) (uuid.UUID, error) {
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, domainErr.ErrInvalidUUID
+	}
+	return id, nil
 }

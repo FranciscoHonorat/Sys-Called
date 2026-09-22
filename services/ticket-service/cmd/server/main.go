@@ -12,10 +12,12 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/infra/cache"
-	httpapi "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/infra/http"
-	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/infra/messaging"
-	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/infra/postgres"
+	httpapi "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/in/http"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/in/messaging"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/out/cache"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/out/postgres"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/command"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/query"
 )
 
 func main() {
@@ -54,10 +56,21 @@ func main() {
 	})
 	defer reader.Close()
 
-	consumer := messaging.NewEmployeesConsumer(reader, responsibles)
+	consumer := messaging.NewEmployeesConsumer(reader, command.NewSyncResponsibleUseCase(responsibles))
 	go consumer.Run(ctx)
 
-	handler := httpapi.NewHandler(store, ticketCache, responsibles)
+	handler := httpapi.NewHandler(httpapi.UseCases{
+		OpenTicket:             command.NewOpenTicketUseCase(store, ticketCache),
+		GetTicket:              query.NewGetTicketUseCase(store, ticketCache),
+		ListTickets:            query.NewListTicketsUseCase(store, ticketCache),
+		EditTicket:             command.NewEditTicketUseCase(store, ticketCache),
+		AssignTicket:           command.NewAssignTicketUseCase(store, ticketCache),
+		AutoAssignTicket:       command.NewAutoAssignTicketUseCase(store, ticketCache, responsibles),
+		ChangeTicketPriority:   command.NewChangeTicketPriorityUseCase(store, ticketCache),
+		MoveTicketToInProgress: command.NewMoveTicketToInProgressUseCase(store, ticketCache),
+		CloseTicket:            command.NewCloseTicketUseCase(store, ticketCache),
+		AddTicketResponse:      command.NewAddTicketResponseUseCase(store, ticketCache),
+	})
 	router := httpapi.NewRouter(handler)
 
 	srv := &http.Server{

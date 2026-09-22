@@ -31,3 +31,7 @@ func (e baseEvent) AggregateID() uuid.UUID {
 func (e baseEvent) OccurredAt() time.Time {
 	return e.occurredAt
 }
+
+func (e *baseEvent) setBase(base baseEvent) {
+	*e = base
+}

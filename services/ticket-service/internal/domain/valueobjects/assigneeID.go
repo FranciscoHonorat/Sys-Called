@@ -19,24 +19,3 @@ func NewAssigneeID(id string) (AssigneeID, error) {
 func (a AssigneeID) GetAssigneeID() string {
 	return a.id
 }
-
-func (a AssigneeID) IsValid() bool {
-	return a.id != ""
-}
-
-func (a AssigneeID) Equals(other AssigneeID) bool {
-	return a.id == other.id
-}
-
-func (a AssigneeID) MarshalJSON() ([]byte, error) {
-	return marshalNonEmptyString(a.id)
-}
-
-func (a *AssigneeID) UnmarshalJSON(data []byte) error {
-	value, err := unmarshalNonEmptyString(data, domainErr.ErrInvalidAssignee)
-	if err != nil {
-		return err
-	}
-	a.id = value
-	return nil
-}
