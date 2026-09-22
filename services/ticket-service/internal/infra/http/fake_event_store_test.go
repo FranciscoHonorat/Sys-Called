@@ -43,3 +43,11 @@ func (s *fakeEventStore) ListAggregateIDs(_ context.Context) ([]uuid.UUID, error
 	copy(ids, s.order)
 	return ids, nil
 }
+
+type fakeResponsibleDirectory struct {
+	responsibles []string
+}
+
+func (d *fakeResponsibleDirectory) List(_ context.Context) ([]string, error) {
+	return d.responsibles, nil
+}

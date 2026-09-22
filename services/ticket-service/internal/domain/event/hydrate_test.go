@@ -49,6 +49,26 @@ func TestHydrate(t *testing.T) {
 		assert.Equal(t, original.Priority, opened.Priority)
 	})
 
+	t.Run("should hydrate a TicketEdited event", func(t *testing.T) {
+		id := valueobjects.NewID(aggregateID)
+		title, err := valueobjects.NewTitle("New Title")
+		require.NoError(t, err)
+		description, err := valueobjects.NewDescription("New Description")
+		require.NoError(t, err)
+
+		original := event.NewTicketEdited(id, title, description)
+		payload, err := json.Marshal(original)
+		require.NoError(t, err)
+
+		hydrated, err := event.Hydrate("TicketEdited", aggregateID, occurredAt, payload)
+
+		assert.NoError(t, err)
+		edited, ok := hydrated.(event.TicketEdited)
+		assert.True(t, ok)
+		assert.Equal(t, original.Title, edited.Title)
+		assert.Equal(t, original.Description, edited.Description)
+	})
+
 	t.Run("should hydrate a TicketAssigned event", func(t *testing.T) {
 		id := valueobjects.NewID(aggregateID)
 		assignee, err := valueobjects.NewAssigneeID("agent-1")

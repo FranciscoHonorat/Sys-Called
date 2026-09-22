@@ -24,7 +24,8 @@ func init() {
 func newTestRouter() *gin.Engine {
 	store := newFakeEventStore()
 	c := cache.NewInMemoryTicketCache()
-	handler := httpapi.NewHandler(store, c)
+	responsibles := &fakeResponsibleDirectory{responsibles: []string{"agent-1", "agent-2", "agent-3"}}
+	handler := httpapi.NewHandler(store, c, responsibles)
 	return httpapi.NewRouter(handler)
 }
 
@@ -67,6 +68,18 @@ func TestTicketLifecycle(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
 	assert.Equal(t, "Valid Title", got.Title)
 	assert.Equal(t, "Open", got.Status)
+
+	w = doRequest(t, router, http.MethodPut, "/tickets/"+opened.TicketID, map[string]string{
+		"title":       "Edited Title",
+		"description": "Edited Description",
+	})
+	assert.Equal(t, http.StatusNoContent, w.Code)
+
+	w = doRequest(t, router, http.MethodGet, "/tickets/"+opened.TicketID, nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	assert.Equal(t, "Edited Title", got.Title)
+	assert.Equal(t, "Edited Description", got.Description)
 
 	w = doRequest(t, router, http.MethodPost, "/tickets/"+opened.TicketID+"/assign", map[string]string{"assignee_id": "agent-1"})
 	assert.Equal(t, http.StatusNoContent, w.Code)
@@ -114,6 +127,31 @@ func TestListTickets(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &tickets))
 	require.Len(t, tickets, 1)
 	assert.Equal(t, "Valid Title", tickets[0].Title)
+}
+
+func TestAutoAssignTicket(t *testing.T) {
+	router := newTestRouter()
+
+	w := doRequest(t, router, http.MethodPost, "/tickets", map[string]string{
+		"title":       "Valid Title",
+		"description": "Valid Description",
+	})
+	require.Equal(t, http.StatusCreated, w.Code)
+	var opened application.OpenTicketOutput
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &opened))
+
+	w = doRequest(t, router, http.MethodPost, "/tickets/"+opened.TicketID+"/assign/auto", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var autoAssigned application.AutoAssignTicketOutput
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &autoAssigned))
+	assert.Contains(t, []string{"agent-1", "agent-2", "agent-3"}, autoAssigned.AssigneeID)
+
+	w = doRequest(t, router, http.MethodGet, "/tickets/"+opened.TicketID, nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	var got application.GetTicketOutput
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	assert.Equal(t, autoAssigned.AssigneeID, got.AssigneeID)
 }
 
 func TestTicketErrors(t *testing.T) {

@@ -28,6 +28,24 @@ func (uc eventSourcedUseCase) loadTicket(ctx context.Context, ticketID uuid.UUID
 	return t, len(history), nil
 }
 
+func (uc eventSourcedUseCase) loadAllTickets(ctx context.Context) ([]*ticket.Ticket, error) {
+	ids, err := uc.store.ListAggregateIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tickets := make([]*ticket.Ticket, 0, len(ids))
+	for _, id := range ids {
+		t, _, err := uc.loadTicket(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		tickets = append(tickets, t)
+	}
+
+	return tickets, nil
+}
+
 func (uc eventSourcedUseCase) commit(ctx context.Context, t *ticket.Ticket, ticketID uuid.UUID, expectedVersion int) error {
 	if err := uc.store.Append(ctx, ticketID, t.GetUncommittedEvents(), expectedVersion); err != nil {
 		return err

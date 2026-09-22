@@ -53,3 +53,12 @@ func (s *fakeEventStore) forgetAll() {
 	s.streams = make(map[uuid.UUID][]event.Event)
 	s.order = nil
 }
+
+type fakeResponsibleDirectory struct {
+	responsibles []string
+	err          error
+}
+
+func (d *fakeResponsibleDirectory) List(_ context.Context) ([]string, error) {
+	return d.responsibles, d.err
+}

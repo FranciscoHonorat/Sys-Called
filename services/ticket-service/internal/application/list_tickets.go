@@ -15,17 +15,13 @@ func NewListTicketsUseCase(store repository.EventStore, cache repository.TicketC
 }
 
 func (uc *ListTicketsUseCase) Execute(ctx context.Context) ([]GetTicketOutput, error) {
-	ids, err := uc.store.ListAggregateIDs(ctx)
+	tickets, err := uc.loadAllTickets(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	outputs := make([]GetTicketOutput, 0, len(ids))
-	for _, id := range ids {
-		t, _, err := uc.loadTicket(ctx, id)
-		if err != nil {
-			return nil, err
-		}
+	outputs := make([]GetTicketOutput, 0, len(tickets))
+	for _, t := range tickets {
 		outputs = append(outputs, toGetTicketOutput(t))
 	}
 

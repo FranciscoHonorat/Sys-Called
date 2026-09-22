@@ -236,6 +236,56 @@ func TestTicket(t *testing.T) {
 		assert.ErrorIs(t, err, domainErr.ErrResponseTicketMismatch)
 	})
 
+	t.Run("should edit the title and description of a Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		newTitle, err := valueobjects.NewTitle("New Title")
+		assert.NoError(t, err)
+		newDescription, err := valueobjects.NewDescription("New Description")
+		assert.NoError(t, err)
+
+		err = tk.Edit(newTitle, newDescription)
+
+		assert.NoError(t, err)
+		assert.Equal(t, newTitle, tk.GetTitle())
+		assert.Equal(t, newDescription, tk.GetDescription())
+		events := tk.GetUncommittedEvents()
+		assert.Equal(t, "TicketEdited", events[len(events)-1].EventName())
+	})
+
+	t.Run("should return an error when editing with a nil title", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		err = tk.Edit(nil, description)
+
+		assert.ErrorIs(t, err, domainErr.ErrInvalidTitle)
+	})
+
+	t.Run("should return an error when editing with a nil description", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+
+		err = tk.Edit(title, nil)
+
+		assert.ErrorIs(t, err, domainErr.ErrInvalidDescription)
+	})
+
+	t.Run("should return an error when editing a closed Ticket", func(t *testing.T) {
+		id, title, description, status, assignee, priority := validTicketParts(t)
+		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
+		assert.NoError(t, err)
+		assert.NoError(t, tk.Close())
+
+		err = tk.Edit(title, description)
+
+		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
+	})
+
 	t.Run("should assign a Ticket to a new assignee", func(t *testing.T) {
 		id, title, description, status, assignee, priority := validTicketParts(t)
 		tk, err := ticket.NewTicket(id, title, description, status, assignee, priority)
@@ -436,6 +486,12 @@ func TestTicket(t *testing.T) {
 		id, title, description, status, assignee, priority := validTicketParts(t)
 		opened := event.NewTicketOpened(id, title, description, status, assignee, priority)
 
+		newTitle, err := valueobjects.NewTitle("New Title")
+		assert.NoError(t, err)
+		newDescription, err := valueobjects.NewDescription("New Description")
+		assert.NoError(t, err)
+		edited := event.NewTicketEdited(id, newTitle, newDescription)
+
 		newAssignee, err := valueobjects.NewAssigneeID("agent-2")
 		assert.NoError(t, err)
 		assigned := event.NewTicketAssigned(id, &newAssignee)
@@ -449,14 +505,14 @@ func TestTicket(t *testing.T) {
 		r := validResponseFor(t, id)
 		responseAdded := event.NewTicketResponseAdded(id, r)
 
-		history := []event.Event{opened, assigned, priorityChanged, movedToInProgress, responseAdded}
+		history := []event.Event{opened, edited, assigned, priorityChanged, movedToInProgress, responseAdded}
 
 		tk, err := ticket.LoadFromHistory(history)
 
 		assert.NoError(t, err)
 		assert.Equal(t, id.GetID(), tk.GetID().GetID())
-		assert.Equal(t, title.GetTitle(), tk.GetTitle().GetTitle())
-		assert.Equal(t, description.GetDescription(), tk.GetDescription().GetDescription())
+		assert.Equal(t, "New Title", tk.GetTitle().GetTitle())
+		assert.Equal(t, "New Description", tk.GetDescription().GetDescription())
 		assert.Equal(t, valueobjects.TicketStatusInProgress, tk.GetStatus())
 		assert.Equal(t, "agent-2", tk.GetAssigneeID().GetAssigneeID())
 		assert.Equal(t, string(valueobjects.TicketPriorityLow), tk.GetPriority().GetPriority())
