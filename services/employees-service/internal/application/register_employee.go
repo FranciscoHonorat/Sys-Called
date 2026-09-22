@@ -3,9 +3,9 @@ package application
 import (
 	"context"
 
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/application/port/out"
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/domain/employee"
-	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/domain/repository"
 )
 
 type RegisterEmployeeInput struct {
@@ -14,10 +14,10 @@ type RegisterEmployeeInput struct {
 }
 
 type RegisterEmployeeUseCase struct {
-	repo repository.EmployeeRepository
+	repo out.EmployeeRepository
 }
 
-func NewRegisterEmployeeUseCase(repo repository.EmployeeRepository) *RegisterEmployeeUseCase {
+func NewRegisterEmployeeUseCase(repo out.EmployeeRepository) *RegisterEmployeeUseCase {
 	return &RegisterEmployeeUseCase{repo: repo}
 }
 
@@ -29,5 +29,5 @@ func (uc *RegisterEmployeeUseCase) Execute(ctx context.Context, input RegisterEm
 		return domainErr.ErrInvalidEmployeeName
 	}
 
-	return uc.repo.Register(ctx, employee.NewEmployee(input.ID, input.Name))
+	return uc.repo.Register(ctx, employee.Register(input.ID, input.Name))
 }

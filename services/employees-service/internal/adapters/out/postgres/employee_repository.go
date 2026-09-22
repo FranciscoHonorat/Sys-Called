@@ -57,19 +57,18 @@ func (r *EmployeeRepository) Register(ctx context.Context, e employee.Employee) 
 		return tx.Commit(ctx)
 	}
 
-	payload, err := json.Marshal(struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	}{ID: e.GetID(), Name: e.GetName()})
-	if err != nil {
-		return err
-	}
+	for _, evt := range e.Events() {
+		payload, err := json.Marshal(evt)
+		if err != nil {
+			return err
+		}
 
-	if _, err := tx.Exec(ctx,
-		`INSERT INTO outbox_events (id, event_type, payload, occurred_at) VALUES ($1, $2, $3, $4)`,
-		uuid.New(), "EmployeeRegistered", payload, time.Now(),
-	); err != nil {
-		return err
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO outbox_events (id, event_type, payload, occurred_at) VALUES ($1, $2, $3, $4)`,
+			uuid.New(), evt.EventType(), payload, time.Now(),
+		); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit(ctx)

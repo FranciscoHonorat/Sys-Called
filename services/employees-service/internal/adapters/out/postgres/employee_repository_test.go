@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/out/postgres"
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/domain/employee"
-	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/infra/postgres"
 )
 
 func testPool(t *testing.T) *pgxpool.Pool {
@@ -53,7 +53,7 @@ func TestEmployeeRepository(t *testing.T) {
 	})
 
 	t.Run("should write an outbox event when registering a new employee", func(t *testing.T) {
-		e := employee.NewEmployee("test-agent-2", "Test Agent Two")
+		e := employee.Register("test-agent-2", "Test Agent Two")
 
 		require.NoError(t, repo.Register(context.Background(), e))
 
@@ -70,7 +70,7 @@ func TestEmployeeRepository(t *testing.T) {
 	})
 
 	t.Run("should not duplicate the employee or the outbox event on repeated registration", func(t *testing.T) {
-		e := employee.NewEmployee("test-agent-3", "Test Agent Three")
+		e := employee.Register("test-agent-3", "Test Agent Three")
 
 		require.NoError(t, repo.Register(context.Background(), e))
 		require.NoError(t, repo.Register(context.Background(), e))

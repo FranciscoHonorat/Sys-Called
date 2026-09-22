@@ -9,6 +9,7 @@ import (
 
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/application"
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/domain/domain-errors"
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/domain/employee"
 )
 
 func TestRegisterEmployeeUseCase(t *testing.T) {
@@ -25,6 +26,7 @@ func TestRegisterEmployeeUseCase(t *testing.T) {
 		require.Len(t, repo.employees, 1)
 		assert.Equal(t, "agent-1", repo.employees[0].GetID())
 		assert.Equal(t, "Ana Souza", repo.employees[0].GetName())
+		assert.Equal(t, []employee.Event{employee.Registered{ID: "agent-1", Name: "Ana Souza"}}, repo.employees[0].Events())
 	})
 
 	t.Run("should return an error for an empty ID", func(t *testing.T) {

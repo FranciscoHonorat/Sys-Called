@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/infra/outbox"
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/application/port/out"
 )
 
 type OutboxStore struct {
@@ -17,7 +17,7 @@ func NewOutboxStore(pool *pgxpool.Pool) *OutboxStore {
 	return &OutboxStore{pool: pool}
 }
 
-func (s *OutboxStore) FetchPending(ctx context.Context) ([]outbox.Event, error) {
+func (s *OutboxStore) FetchPending(ctx context.Context) ([]out.OutboxEvent, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT id, event_type, payload FROM outbox_events WHERE published_at IS NULL ORDER BY occurred_at ASC`,
 	)
@@ -26,9 +26,9 @@ func (s *OutboxStore) FetchPending(ctx context.Context) ([]outbox.Event, error) 
 	}
 	defer rows.Close()
 
-	var events []outbox.Event
+	var events []out.OutboxEvent
 	for rows.Next() {
-		var e outbox.Event
+		var e out.OutboxEvent
 		if err := rows.Scan(&e.ID, &e.EventType, &e.Payload); err != nil {
 			return nil, err
 		}
