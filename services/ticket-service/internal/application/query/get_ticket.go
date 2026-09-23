@@ -6,10 +6,13 @@ import (
 
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/actor"
+	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 )
 
 type GetTicketInput struct {
+	Viewer   actor.Actor
 	TicketID string
 }
 
@@ -27,7 +30,10 @@ type GetTicketOutput struct {
 	Status      string                    `json:"status"`
 	AssigneeID  string                    `json:"assignee_id,omitempty"`
 	Priority    string                    `json:"priority,omitempty"`
+	RequesterID string                    `json:"requester_id,omitempty"`
 	CreatedAt   time.Time                 `json:"created_at"`
+	ClosedAt    *time.Time                `json:"closed_at,omitempty"`
+	Resolution  string                    `json:"resolution,omitempty"`
 	Responses   []GetTicketResponseOutput `json:"responses,omitempty"`
 }
 
@@ -44,6 +50,9 @@ func (uc *GetTicketUseCase) Execute(ctx context.Context, input GetTicketInput) (
 	if err != nil {
 		return GetTicketOutput{}, err
 	}
+	if !t.IsVisibleTo(input.Viewer) {
+		return GetTicketOutput{}, domainErr.ErrEventStreamNotFound
+	}
 
 	return toGetTicketOutput(t), nil
 }
@@ -55,6 +64,9 @@ func toGetTicketOutput(t *ticket.Ticket) GetTicketOutput {
 		Description: t.GetDescription().GetDescription(),
 		Status:      t.GetStatus().String(),
 		CreatedAt:   t.GetCreatedAt(),
+		RequesterID: t.GetRequesterID(),
+		ClosedAt:    t.GetClosedAt(),
+		Resolution:  t.GetResolution(),
 	}
 
 	if t.GetAssigneeID() != nil {

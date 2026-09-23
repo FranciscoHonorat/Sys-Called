@@ -9,7 +9,7 @@ import (
 )
 
 type EventStore interface {
-	Append(ctx context.Context, aggregateID uuid.UUID, events []event.Event, expectedVersion int) error
+	Append(ctx context.Context, aggregateID uuid.UUID, events []event.Event, expectedVersion int, actorID string) error
 	Load(ctx context.Context, aggregateID uuid.UUID) ([]event.Event, error)
 	ListAggregateIDs(ctx context.Context) ([]uuid.UUID, error)
 }

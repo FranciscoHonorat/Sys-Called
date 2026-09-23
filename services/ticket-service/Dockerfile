@@ -14,6 +14,7 @@ RUN apk add --no-cache ca-certificates && \
     adduser -D -u 10001 appuser
 
 COPY --from=builder /out/server /usr/local/bin/server
+COPY --from=builder /src/internal/adapters/out/postgres/migrations /migrations
 
 USER appuser
 

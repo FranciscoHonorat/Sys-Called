@@ -5,10 +5,12 @@ import (
 
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/actor"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 )
 
 type MoveTicketToInProgressInput struct {
+	Actor    actor.Actor
 	TicketID string
 }
 
@@ -21,7 +23,7 @@ func NewMoveTicketToInProgressUseCase(store out.EventStore, cache out.TicketCach
 }
 
 func (uc *MoveTicketToInProgressUseCase) Execute(ctx context.Context, input MoveTicketToInProgressInput) error {
-	return uc.UpdateTicket(ctx, input.TicketID, func(t *ticket.Ticket) error {
+	return uc.UpdateTicket(ctx, input.Actor, input.TicketID, ticket.CanWork, func(t *ticket.Ticket) error {
 		return t.MoveToInProgress()
 	})
 }

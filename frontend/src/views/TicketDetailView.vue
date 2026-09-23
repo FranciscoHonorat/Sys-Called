@@ -2,10 +2,13 @@
 import { computed, inject, ref } from 'vue'
 
 import { sessionKey } from '../auth/session'
-import AppHeader from '../components/AppHeader.vue'
+import ClosingReport from '../components/ClosingReport.vue'
+import CloseTicketModal from '../components/CloseTicketModal.vue'
+import PageLayout from '../components/PageLayout.vue'
 import FormField from '../components/FormField.vue'
 import TicketActions from '../components/TicketActions.vue'
 import TicketEditForm from '../components/TicketEditForm.vue'
+import { paths } from '../router/paths'
 import { formatDate } from '../tickets/format'
 import { allowedActions, type TicketAction } from '../tickets/permissions'
 import { priorityLabel } from '../tickets/priority'
@@ -19,6 +22,12 @@ const session = inject(sessionKey)!
 const { api, ticket, responsibles, notFound, actionError, perform } = useTicketDetail(props.id)
 
 const reply = ref('')
+const closing = ref(false)
+
+async function closeTicket(resolution: string) {
+  await perform(() => api.close(props.id, resolution))
+  closing.value = false
+}
 const editing = ref(false)
 
 const actions = computed(() =>
@@ -41,8 +50,7 @@ async function sendReply() {
 </script>
 
 <template>
-  <main class="min-h-screen bg-slate-100 p-6">
-    <AppHeader />
+  <PageLayout back :back-to="paths.tickets">
 
     <p v-if="notFound" class="rounded-lg bg-white p-6 text-slate-600 shadow">Chamado não encontrado</p>
 
@@ -61,11 +69,12 @@ async function sendReply() {
         <p v-if="!editing" class="mt-2 whitespace-pre-line text-slate-700">{{ ticket.description }}</p>
       </header>
 
-      <ul aria-label="Detalhes" class="grid gap-2 text-sm sm:grid-cols-4">
+      <ul aria-label="Detalhes" class="grid gap-2 text-sm sm:grid-cols-5">
         <li><span class="block text-slate-500">Status</span>{{ statusLabel(ticket.status) }}</li>
         <li><span class="block text-slate-500">Prioridade</span>{{ priorityLabel(ticket.priority) }}</li>
         <li><span class="block text-slate-500">Responsável</span>{{ nameOf(ticket.assignee_id) }}</li>
         <li><span class="block text-slate-500">Aberto em</span>{{ formatDate(ticket.created_at) }}</li>
+        <li v-if="ticket.closed_at"><span class="block text-slate-500">Fechado em</span>{{ formatDate(ticket.closed_at) }}</li>
       </ul>
 
       <TicketActions
@@ -76,8 +85,15 @@ async function sendReply() {
         @auto-assign="perform(() => api.autoAssign(id))"
         @change-priority="(priority) => perform(() => api.changePriority(id, priority))"
         @start="perform(() => api.start(id))"
-        @close="perform(() => api.close(id))"
+        @close="closing = true"
         @edit="editing = true"
+      />
+
+      <ClosingReport
+        v-if="ticket.closed_at"
+        :resolution="ticket.resolution"
+        :opened-at="ticket.created_at"
+        :closed-at="ticket.closed_at"
       />
 
       <section>
@@ -95,7 +111,15 @@ async function sendReply() {
         </form>
       </section>
     </article>
-  </main>
+
+    <CloseTicketModal
+      v-if="ticket"
+      :open="closing"
+      :opened-at="ticket.created_at"
+      @close="closing = false"
+      @confirm="closeTicket"
+    />
+  </PageLayout>
 </template>
 
 <style scoped>

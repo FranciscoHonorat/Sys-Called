@@ -15,10 +15,11 @@ import (
 func TestMoveTicketToInProgressUseCase(t *testing.T) {
 	t.Run("should move an existing open ticket to in progress", func(t *testing.T) {
 		store := outtest.NewEventStore()
-		ticketID := openTestTicket(t, store)
+		ticketID := openAssignedTicket(t, store)
 		uc := command.NewMoveTicketToInProgressUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.MoveTicketToInProgressInput{
+			Actor:    assignedAgent,
 			TicketID: ticketID,
 		})
 
@@ -33,6 +34,7 @@ func TestMoveTicketToInProgressUseCase(t *testing.T) {
 		uc := command.NewMoveTicketToInProgressUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.MoveTicketToInProgressInput{
+			Actor:    assignedAgent,
 			TicketID: "00000000-0000-0000-0000-000000000001",
 		})
 
@@ -41,11 +43,11 @@ func TestMoveTicketToInProgressUseCase(t *testing.T) {
 
 	t.Run("should return an error when the ticket is already in progress", func(t *testing.T) {
 		store := outtest.NewEventStore()
-		ticketID := openTestTicket(t, store)
+		ticketID := openAssignedTicket(t, store)
 		uc := command.NewMoveTicketToInProgressUseCase(store, newTestCache())
-		assert.NoError(t, uc.Execute(context.Background(), command.MoveTicketToInProgressInput{TicketID: ticketID}))
+		assert.NoError(t, uc.Execute(context.Background(), command.MoveTicketToInProgressInput{Actor: assignedAgent, TicketID: ticketID}))
 
-		err := uc.Execute(context.Background(), command.MoveTicketToInProgressInput{TicketID: ticketID})
+		err := uc.Execute(context.Background(), command.MoveTicketToInProgressInput{Actor: assignedAgent, TicketID: ticketID})
 
 		assert.ErrorIs(t, err, domainErr.ErrInvalidStatusTransition)
 	})

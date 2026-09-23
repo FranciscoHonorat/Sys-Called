@@ -9,25 +9,40 @@ import (
 )
 
 type RegisterEmployeeInput struct {
-	ID   string
-	Name string
+	ID       string
+	Name     string
+	Username string
+	Password string
+	Role     string
 }
 
 type RegisterEmployeeUseCase struct {
-	repo out.EmployeeRepository
+	repo   out.EmployeeRepository
+	hasher out.PasswordHasher
 }
 
-func NewRegisterEmployeeUseCase(repo out.EmployeeRepository) *RegisterEmployeeUseCase {
-	return &RegisterEmployeeUseCase{repo: repo}
+func NewRegisterEmployeeUseCase(repo out.EmployeeRepository, hasher out.PasswordHasher) *RegisterEmployeeUseCase {
+	return &RegisterEmployeeUseCase{repo: repo, hasher: hasher}
 }
 
 func (uc *RegisterEmployeeUseCase) Execute(ctx context.Context, input RegisterEmployeeInput) error {
-	if input.ID == "" {
-		return domainErr.ErrInvalidEmployeeID
+	if input.Password == "" {
+		return domainErr.ErrInvalidPassword
 	}
-	if input.Name == "" {
-		return domainErr.ErrInvalidEmployeeName
+	role, err := employee.NewRole(input.Role)
+	if err != nil {
+		return err
 	}
 
-	return uc.repo.Register(ctx, employee.Register(input.ID, input.Name))
+	passwordHash, err := uc.hasher.Hash(input.Password)
+	if err != nil {
+		return err
+	}
+
+	e, err := employee.Register(input.ID, input.Name, input.Username, role, passwordHash)
+	if err != nil {
+		return err
+	}
+
+	return uc.repo.Register(ctx, e)
 }

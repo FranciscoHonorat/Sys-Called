@@ -1,27 +1,34 @@
 package httpapi
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/application"
 )
 
-type Handler struct {
-	listEmployees *application.ListEmployeesUseCase
+type UseCases struct {
+	Authenticate           *application.AuthenticateUseCase
+	ListEmployees          *application.ListEmployeesUseCase
+	Login                  *application.LoginUseCase
+	RefreshSession         *application.RefreshSessionUseCase
+	Logout                 *application.LogoutUseCase
+	PublicKeys             *application.GetPublicKeysUseCase
+	SignUp                 *application.SignUpUseCase
+	RequestPasswordReset   *application.RequestPasswordResetUseCase
+	ApproveEmployee        *application.ApproveEmployeeUseCase
+	IssueTemporaryPassword *application.IssueTemporaryPasswordUseCase
+	ChangePassword         *application.ChangePasswordUseCase
 }
 
-func NewHandler(listEmployees *application.ListEmployeesUseCase) *Handler {
-	return &Handler{listEmployees: listEmployees}
+type Handler struct {
+	useCases UseCases
+}
+
+func NewHandler(useCases UseCases) *Handler {
+	return &Handler{useCases: useCases}
 }
 
 func (h *Handler) ListEmployees(c *gin.Context) {
-	output, err := h.listEmployees.Execute(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
-	}
-
-	c.JSON(http.StatusOK, output)
+	output, err := h.useCases.ListEmployees.Execute(c.Request.Context(), CallerFrom(c))
+	respondJSON(c, output, err)
 }

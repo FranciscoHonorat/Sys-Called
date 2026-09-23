@@ -7,14 +7,15 @@ import (
 
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/actor"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/response"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 )
 
 type AddTicketResponseInput struct {
+	Actor    actor.Actor
 	TicketID string
-	AuthorID string
 	Content  string
 }
 
@@ -27,8 +28,8 @@ func NewAddTicketResponseUseCase(store out.EventStore, cache out.TicketCache) *A
 }
 
 func (uc *AddTicketResponseUseCase) Execute(ctx context.Context, input AddTicketResponseInput) error {
-	return uc.UpdateTicket(ctx, input.TicketID, func(t *ticket.Ticket) error {
-		authorID, err := valueobjects.NewAuthorID(input.AuthorID)
+	return uc.UpdateTicket(ctx, input.Actor, input.TicketID, ticket.CanRespond, func(t *ticket.Ticket) error {
+		authorID, err := valueobjects.NewAuthorID(input.Actor.ID())
 		if err != nil {
 			return err
 		}

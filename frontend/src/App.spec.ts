@@ -8,6 +8,8 @@ import { createSession, sessionKey } from './auth/session'
 import { createAppRouter } from './router'
 import { paths } from './router/paths'
 import { fakeAuthService } from './test/fakeAuthService'
+import { fakeTicketsApi } from './test/fakeTicketsApi'
+import { ticketsApiKey } from './tickets/ticketsApi'
 
 async function renderAppAt(path: string, loggedInAs: User) {
   const session = createSession()
@@ -15,7 +17,10 @@ async function renderAppAt(path: string, loggedInAs: User) {
   const authService = fakeAuthService({ login: vi.fn().mockResolvedValue(loggedInAs) })
   await router.push(path)
   render(App, {
-    global: { plugins: [router], provide: { [sessionKey]: session, [authServiceKey]: authService } },
+    global: {
+      plugins: [router],
+      provide: { [sessionKey]: session, [authServiceKey]: authService, [ticketsApiKey]: fakeTicketsApi() },
+    },
   })
   return router
 }
@@ -43,9 +48,24 @@ describe('App', () => {
     expect(router.currentRoute.value.path).toBe(paths.login)
   })
 
-  it('tells that pages still under construction are coming soon', async () => {
-    await renderAppAt(paths.register, ana)
+  it('lets a visitor create an account or ask for a new password', async () => {
+    const router = await renderAppAt(paths.login, ana)
 
-    expect(await screen.findByText('Em breve')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('link', { name: 'Criar conta' }))
+    expect(await screen.findByLabelText('Confirmar senha')).toBeInTheDocument()
+
+    await router.push(paths.recoverPassword)
+    expect(await screen.findByRole('button', { name: 'Pedir nova senha' })).toBeInTheDocument()
+  })
+
+  it('makes whoever logs in with a temporary password choose a new one first', async () => {
+    const router = await renderAppAt(paths.login, { ...ana, mustChangePassword: true })
+
+    await userEvent.type(screen.getByLabelText('Username'), 'ana')
+    await userEvent.type(screen.getByLabelText('Senha'), 'Temp-1234')
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByRole('button', { name: 'Salvar nova senha' })).toBeInTheDocument()
+    expect(router.currentRoute.value.path).toBe(paths.changePassword)
   })
 })

@@ -1,0 +1,78 @@
+{{- $image := include "sys-called.image" .Values.images.ticketService -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-service
+  labels:
+    {{- include "sys-called.labels" . | nindent 4 }}
+    app.kubernetes.io/name: ticket-service
+spec:
+  selector:
+    {{- include "sys-called.selector" (dict "root" . "name" "ticket-service") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service
+  labels:
+    {{- include "sys-called.labels" . | nindent 4 }}
+    app.kubernetes.io/name: ticket-service
+spec:
+  replicas: {{ .Values.ticketService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "sys-called.selector" (dict "root" . "name" "ticket-service") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sys-called.labels" . | nindent 8 }}
+        app.kubernetes.io/name: ticket-service
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      initContainers:
+        {{- include "sys-called.initContainers" (dict "root" . "image" $image "db" "ticket" "database" .Values.databases.ticket) | nindent 8 }}
+      containers:
+        - name: ticket-service
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: KAFKA_BROKERS
+              value: kafka:9092
+            - name: EMPLOYEES_JWKS_URL
+              value: http://employees-service:8081/.well-known/jwks.json
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sys-called.secretName" . }}
+                  key: ticket-db-password
+            - name: DATABASE_URL
+              value: postgres://{{ .Values.databases.ticket.user }}:$(DB_PASSWORD)@ticket-postgres:5432/{{ .Values.databases.ticket.name }}?sslmode=disable
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            {{- include "sys-called.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.ticketService.resources | nindent 12 }}
+      volumes:
+        - name: migrations
+          emptyDir: {}

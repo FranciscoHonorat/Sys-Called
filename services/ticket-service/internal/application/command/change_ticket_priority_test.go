@@ -18,6 +18,7 @@ func TestChangeTicketPriorityUseCase(t *testing.T) {
 		uc := command.NewChangeTicketPriorityUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.ChangeTicketPriorityInput{
+			Actor:    testAdmin,
 			TicketID: ticketID,
 			Priority: "High",
 		})
@@ -33,6 +34,7 @@ func TestChangeTicketPriorityUseCase(t *testing.T) {
 		uc := command.NewChangeTicketPriorityUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.ChangeTicketPriorityInput{
+			Actor:    testAdmin,
 			TicketID: "00000000-0000-0000-0000-000000000001",
 			Priority: "High",
 		})
@@ -46,6 +48,7 @@ func TestChangeTicketPriorityUseCase(t *testing.T) {
 		uc := command.NewChangeTicketPriorityUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.ChangeTicketPriorityInput{
+			Actor:    testAdmin,
 			TicketID: ticketID,
 			Priority: "bogus",
 		})

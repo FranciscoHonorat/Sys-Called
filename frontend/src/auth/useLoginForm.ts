@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-import type { AuthService, User } from './authService'
+import { AccountPendingError, type AuthService, type User } from './authService'
 import { hasErrors, validateCredentials, type CredentialErrors } from './validateCredentials'
 
 export function useLoginForm(authService: AuthService, onAuthenticated: (user: User) => void) {
@@ -17,8 +17,11 @@ export function useLoginForm(authService: AuthService, onAuthenticated: (user: U
 
     try {
       onAuthenticated(await authService.login(username.value, password.value))
-    } catch {
-      loginError.value = 'Username ou senha inválidos'
+    } catch (error) {
+      loginError.value =
+        error instanceof AccountPendingError
+          ? 'Sua conta ainda aguarda a aprovação do administrador'
+          : 'Username ou senha inválidos'
     }
   }
 

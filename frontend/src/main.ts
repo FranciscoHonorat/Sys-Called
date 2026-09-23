@@ -6,6 +6,7 @@ import { authServiceKey } from './auth/authService'
 import { createHttpAuthService } from './auth/httpAuthService'
 import { restoreSession } from './auth/restoreSession'
 import { createSession, sessionKey } from './auth/session'
+import { createEmployeesApi, employeesApiKey } from './employees/employeesApi'
 import { createAppRouter } from './router'
 import { createTicketsApi, ticketsApiKey } from './tickets/ticketsApi'
 import './style.css'
@@ -20,4 +21,5 @@ createApp(App)
   .provide(sessionKey, session)
   .provide(authServiceKey, authService)
   .provide(ticketsApiKey, createTicketsApi(authService))
+  .provide(employeesApiKey, createEmployeesApi(authService))
   .mount('#app')

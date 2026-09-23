@@ -113,7 +113,7 @@ describe('ticketsApi', () => {
     ['assign', (api: TicketsApi) => api.assign('t-1', 'agent-2'), 'POST', '/api/tickets/tickets/t-1/assign', { assignee_id: 'agent-2' }],
     ['change priority', (api: TicketsApi) => api.changePriority('t-1', 'High'), 'POST', '/api/tickets/tickets/t-1/priority', { priority: 'High' }],
     ['start', (api: TicketsApi) => api.start('t-1'), 'POST', '/api/tickets/tickets/t-1/start', undefined],
-    ['close', (api: TicketsApi) => api.close('t-1'), 'POST', '/api/tickets/tickets/t-1/close', undefined],
+    ['close', (api: TicketsApi) => api.close('t-1', 'Troquei o cabo'), 'POST', '/api/tickets/tickets/t-1/close', { resolution: 'Troquei o cabo' }],
     ['respond', (api: TicketsApi) => api.respond('t-1', 'Resolvido'), 'POST', '/api/tickets/tickets/t-1/responses', { content: 'Resolvido' }],
   ] as const)('%s calls the matching endpoint and accepts an empty answer', async (_, run, method, url, body) => {
     const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
@@ -129,5 +129,30 @@ describe('ticketsApi', () => {
 
     expect(await api.autoAssign('t-1')).toBe('agent-3')
     expect(lastCall(fetchFn)).toEqual({ url: '/api/tickets/tickets/t-1/assign/auto', method: 'POST', body: undefined })
+  })
+
+  it('reads the notifications of the logged in user', async () => {
+    const feed = { unread: 1, items: [{ id: 'n-1', message: 'Novo chamado: Impressora', ticket_id: 't-1', created_at: '2026-09-23T10:00:00Z', unread: true }] }
+    const { fetchFn, api } = apiAnswering(200, feed)
+
+    expect(await api.notifications()).toEqual(feed)
+    expect(lastCall(fetchFn)).toEqual({ url: '/api/tickets/notifications', method: 'GET', body: undefined })
+  })
+
+  it('marks the notifications as read', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    const api = createTicketsApi(tokenSource(['token-1']), fetchFn)
+
+    await api.markNotificationsRead()
+
+    expect(lastCall(fetchFn)).toEqual({ url: '/api/tickets/notifications/read', method: 'POST', body: undefined })
+  })
+
+  it('reads the workload of each support agent', async () => {
+    const workload = [{ id: 'agent-1', name: 'Ana Souza', open: 1, in_progress: 2, closed: 3 }]
+    const { fetchFn, api } = apiAnswering(200, workload)
+
+    expect(await api.supportWorkload()).toEqual(workload)
+    expect(lastCall(fetchFn)).toEqual({ url: '/api/tickets/responsibles/workload', method: 'GET', body: undefined })
   })
 })

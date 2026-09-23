@@ -14,16 +14,23 @@ func NewRouter(h *Handler) *gin.Engine {
 		c.Status(http.StatusOK)
 	})
 
-	r.POST("/tickets", h.OpenTicket)
-	r.GET("/tickets", h.ListTickets)
-	r.GET("/tickets/:id", h.GetTicket)
-	r.PUT("/tickets/:id", h.EditTicket)
-	r.POST("/tickets/:id/assign", h.AssignTicket)
-	r.POST("/tickets/:id/assign/auto", h.AutoAssignTicket)
-	r.POST("/tickets/:id/priority", h.ChangeTicketPriority)
-	r.POST("/tickets/:id/start", h.MoveTicketToInProgress)
-	r.POST("/tickets/:id/close", h.CloseTicket)
-	r.POST("/tickets/:id/responses", h.AddTicketResponse)
+	authenticated := RequireAuthentication(h.useCases.Authenticate)
+	r.GET("/responsibles", authenticated, h.ListResponsibles)
+	r.GET("/responsibles/workload", authenticated, h.SupportWorkload)
+	r.GET("/notifications", authenticated, h.ListNotifications)
+	r.POST("/notifications/read", authenticated, h.MarkNotificationsRead)
+
+	tickets := r.Group("/tickets", authenticated)
+	tickets.POST("", h.OpenTicket)
+	tickets.GET("", h.ListTickets)
+	tickets.GET("/:id", h.GetTicket)
+	tickets.PUT("/:id", h.EditTicket)
+	tickets.POST("/:id/assign", h.AssignTicket)
+	tickets.POST("/:id/assign/auto", h.AutoAssignTicket)
+	tickets.POST("/:id/priority", h.ChangeTicketPriority)
+	tickets.POST("/:id/start", h.MoveTicketToInProgress)
+	tickets.POST("/:id/close", h.CloseTicket)
+	tickets.POST("/:id/responses", h.AddTicketResponse)
 
 	return r
 }

@@ -31,7 +31,7 @@ func TestHydrate(t *testing.T) {
 		priority, err := valueobjects.NewPriority(string(valueobjects.TicketPriorityHigh))
 		require.NoError(t, err)
 
-		original := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, &assignee, &priority)
+		original := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, &assignee, &priority, "user-1")
 		payload, err := json.Marshal(original)
 		require.NoError(t, err)
 
@@ -118,7 +118,7 @@ func TestHydrate(t *testing.T) {
 
 	t.Run("should hydrate a TicketClosed event", func(t *testing.T) {
 		id := valueobjects.NewID(aggregateID)
-		original := event.NewTicketClosed(id)
+		original := event.NewTicketClosed(id, "Resolvido")
 		payload, err := json.Marshal(original)
 		require.NoError(t, err)
 

@@ -15,11 +15,30 @@ import (
 )
 
 func TestOpenTicketUseCase(t *testing.T) {
+	t.Run("should record the actor as the one who opened the ticket", func(t *testing.T) {
+		store := outtest.NewEventStore()
+		uc := command.NewOpenTicketUseCase(store, newTestCache())
+
+		output, err := uc.Execute(context.Background(), command.OpenTicketInput{
+			Actor:       outtest.Actor("user-7", "user"),
+			Title:       "Valid Title",
+			Description: "Valid Description",
+		})
+		assert.NoError(t, err)
+
+		history, err := store.Load(context.Background(), uuid.MustParse(output.TicketID))
+		assert.NoError(t, err)
+		tk, err := ticket.LoadFromHistory(history)
+		assert.NoError(t, err)
+		assert.Equal(t, "user-7", tk.GetRequesterID())
+	})
+
 	t.Run("should open a new ticket and persist a TicketOpened event", func(t *testing.T) {
 		store := outtest.NewEventStore()
 		uc := command.NewOpenTicketUseCase(store, newTestCache())
 
 		output, err := uc.Execute(context.Background(), command.OpenTicketInput{
+			Actor:       testAdmin,
 			Title:       "Valid Title",
 			Description: "Valid Description",
 			AssigneeID:  "agent-1",
@@ -43,11 +62,26 @@ func TestOpenTicketUseCase(t *testing.T) {
 		assert.Equal(t, "agent-1", tk.GetAssigneeID().GetAssigneeID())
 	})
 
+	t.Run("should forbid a regular user from choosing the assignee when opening a ticket", func(t *testing.T) {
+		store := outtest.NewEventStore()
+		uc := command.NewOpenTicketUseCase(store, newTestCache())
+
+		_, err := uc.Execute(context.Background(), command.OpenTicketInput{
+			Actor:       testUser,
+			Title:       "Valid Title",
+			Description: "Valid Description",
+			AssigneeID:  "agent-1",
+		})
+
+		assert.ErrorIs(t, err, domainErr.ErrForbidden)
+	})
+
 	t.Run("should open a new ticket without an assignee or priority", func(t *testing.T) {
 		store := outtest.NewEventStore()
 		uc := command.NewOpenTicketUseCase(store, newTestCache())
 
 		output, err := uc.Execute(context.Background(), command.OpenTicketInput{
+			Actor:       testUser,
 			Title:       "Valid Title",
 			Description: "Valid Description",
 		})
@@ -61,6 +95,7 @@ func TestOpenTicketUseCase(t *testing.T) {
 		uc := command.NewOpenTicketUseCase(store, newTestCache())
 
 		_, err := uc.Execute(context.Background(), command.OpenTicketInput{
+			Actor:       testUser,
 			Title:       "",
 			Description: "Valid Description",
 		})
@@ -73,6 +108,7 @@ func TestOpenTicketUseCase(t *testing.T) {
 		uc := command.NewOpenTicketUseCase(store, newTestCache())
 
 		_, err := uc.Execute(context.Background(), command.OpenTicketInput{
+			Actor:       testUser,
 			Title:       "Valid Title",
 			Description: "Valid Description",
 			Priority:    "bogus",

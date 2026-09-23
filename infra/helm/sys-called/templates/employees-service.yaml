@@ -1,0 +1,81 @@
+{{- $image := include "sys-called.image" .Values.images.employeesService -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: employees-service
+  labels:
+    {{- include "sys-called.labels" . | nindent 4 }}
+    app.kubernetes.io/name: employees-service
+spec:
+  selector:
+    {{- include "sys-called.selector" (dict "root" . "name" "employees-service") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: employees-service
+  labels:
+    {{- include "sys-called.labels" . | nindent 4 }}
+    app.kubernetes.io/name: employees-service
+spec:
+  replicas: {{ .Values.employeesService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "sys-called.selector" (dict "root" . "name" "employees-service") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sys-called.labels" . | nindent 8 }}
+        app.kubernetes.io/name: employees-service
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      initContainers:
+        {{- include "sys-called.initContainers" (dict "root" . "image" $image "db" "employees" "database" .Values.databases.employees) | nindent 8 }}
+      containers:
+        - name: employees-service
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: PORT
+              value: "8081"
+            - name: KAFKA_BROKERS
+              value: kafka:9092
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sys-called.secretName" . }}
+                  key: employees-db-password
+            - name: DATABASE_URL
+              value: postgres://{{ .Values.databases.employees.user }}:$(DB_PASSWORD)@employees-postgres:5432/{{ .Values.databases.employees.name }}?sslmode=disable
+            - name: JWT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sys-called.secretName" . }}
+                  key: jwt-private-key
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            {{- include "sys-called.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.employeesService.resources | nindent 12 }}
+      volumes:
+        - name: migrations
+          emptyDir: {}

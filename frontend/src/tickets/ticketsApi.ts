@@ -1,12 +1,7 @@
 import type { InjectionKey } from 'vue'
 
-import type { User } from '../auth/authService'
+import { createApiClient, SessionExpiredError, type TokenSource } from '../api/apiClient'
 import type { TicketStatus } from './status'
-
-export interface TokenSource {
-  accessToken(): string | null
-  restore(): Promise<User | null>
-}
 
 export interface Ticket {
   ticket_id: string
@@ -17,6 +12,8 @@ export interface Ticket {
   assignee_id?: string
   requester_id?: string
   created_at: string
+  closed_at?: string
+  resolution?: string
 }
 
 export interface TicketResponse {
@@ -35,10 +32,25 @@ export interface Responsible {
   name: string
 }
 
-export class SessionExpiredError extends Error {
-  constructor() {
-    super('session expired')
-  }
+export interface Notification {
+  id: string
+  message: string
+  ticket_id?: string
+  created_at: string
+  unread: boolean
+}
+
+export interface AgentWorkload {
+  id: string
+  name: string
+  open: number
+  in_progress: number
+  closed: number
+}
+
+export interface NotificationFeed {
+  unread: number
+  items: Notification[]
 }
 
 export interface NewTicket {
@@ -57,14 +69,11 @@ export interface TicketsApi {
   autoAssign(id: string): Promise<string>
   changePriority(id: string, priority: string): Promise<void>
   start(id: string): Promise<void>
-  close(id: string): Promise<void>
+  close(id: string, resolution: string): Promise<void>
   respond(id: string, content: string): Promise<void>
-}
-
-interface ApiCall {
-  method: 'GET' | 'POST' | 'PUT'
-  path: string
-  payload?: unknown
+  notifications(): Promise<NotificationFeed>
+  markNotificationsRead(): Promise<void>
+  supportWorkload(): Promise<AgentWorkload[]>
 }
 
 function ticketPath(id: string, action?: string): string {
@@ -72,36 +81,7 @@ function ticketPath(id: string, action?: string): string {
 }
 
 export function createTicketsApi(tokens: TokenSource, fetchFn: typeof fetch = fetch): TicketsApi {
-  function send({ method, path, payload }: ApiCall) {
-    return fetchFn(`/api/tickets${path}`, {
-      method,
-      headers: { Authorization: `Bearer ${tokens.accessToken()}`, 'Content-Type': 'application/json' },
-      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-    })
-  }
-
-  async function sendRenewingSession(call: ApiCall): Promise<Response> {
-    const response = await send(call)
-    if (response.status !== 401) {
-      return response
-    }
-    if (!(await tokens.restore())) {
-      throw new SessionExpiredError()
-    }
-    return send(call)
-  }
-
-  async function request<T>(call: ApiCall): Promise<T> {
-    const response = await sendRenewingSession(call)
-    if (response.status === 204) {
-      return undefined as T
-    }
-    const body = await response.json()
-    if (!response.ok) {
-      throw new Error(body.error ?? 'request failed')
-    }
-    return body as T
-  }
+  const request = createApiClient('/api/tickets', tokens, fetchFn)
 
   return {
     list: () => request<Ticket[]>({ method: 'GET', path: '/tickets' }),
@@ -117,9 +97,15 @@ export function createTicketsApi(tokens: TokenSource, fetchFn: typeof fetch = fe
     changePriority: (id, priority) =>
       request<void>({ method: 'POST', path: ticketPath(id, 'priority'), payload: { priority } }),
     start: (id) => request<void>({ method: 'POST', path: ticketPath(id, 'start') }),
-    close: (id) => request<void>({ method: 'POST', path: ticketPath(id, 'close') }),
+    close: (id, resolution) =>
+      request<void>({ method: 'POST', path: ticketPath(id, 'close'), payload: { resolution } }),
     respond: (id, content) => request<void>({ method: 'POST', path: ticketPath(id, 'responses'), payload: { content } }),
+    notifications: () => request<NotificationFeed>({ method: 'GET', path: '/notifications' }),
+    markNotificationsRead: () => request<void>({ method: 'POST', path: '/notifications/read' }),
+    supportWorkload: () => request<AgentWorkload[]>({ method: 'GET', path: '/responsibles/workload' }),
   }
 }
 
 export const ticketsApiKey: InjectionKey<TicketsApi> = Symbol('ticketsApi')
+
+export { SessionExpiredError, type TokenSource }

@@ -74,6 +74,20 @@ describe('TicketDetailView', () => {
     expect(screen.getByText('Não imprime nada')).toBeInTheDocument()
   })
 
+  it('goes back to the ticket list', async () => {
+    await renderLoadedDetail(requester, openTicket)
+
+    expect(screen.getByRole('link', { name: '← Voltar' })).toHaveAttribute('href', '/chamados')
+  })
+
+  it('shows when a closed ticket was closed', async () => {
+    await renderLoadedDetail(requester, { ...openTicket, status: 'Closed', closed_at: '2026-09-23T16:00:00Z' })
+
+    const details = screen.getByRole('list', { name: 'Detalhes' })
+    expect(within(details).getByText('Fechado em')).toBeInTheDocument()
+    expect(within(details).getByText('23/09/2026')).toBeInTheDocument()
+  })
+
   it('shows the conversation with the author of each response', async () => {
     await renderLoadedDetail(requester, openTicket)
 
@@ -86,7 +100,8 @@ describe('TicketDetailView', () => {
   })
 
   describe('offers only the actions the user can perform', () => {
-    const actionButtons = () => screen.queryAllByRole('button').map((b) => b.textContent?.trim()).filter((t) => t !== 'Sair')
+    const actionButtons = () =>
+      within(screen.getByRole('article')).queryAllByRole('button').map((b) => b.textContent?.trim())
 
     it('lets the requester edit and reply', async () => {
       await renderLoadedDetail(requester, openTicket)
@@ -116,7 +131,6 @@ describe('TicketDetailView', () => {
   describe('performs the actions and shows the updated ticket', () => {
     it.each([
       ['Iniciar atendimento', undefined, (api: TicketsApi) => expect(api.start).toHaveBeenCalledWith('t-1')],
-      ['Fechar chamado', undefined, (api: TicketsApi) => expect(api.close).toHaveBeenCalledWith('t-1')],
       ['Distribuir automaticamente', undefined, (api: TicketsApi) => expect(api.autoAssign).toHaveBeenCalledWith('t-1')],
       ['Atribuir', ['Atribuir a', 'Bruno Lima'], (api: TicketsApi) => expect(api.assign).toHaveBeenCalledWith('t-1', 'agent-2')],
       ['Alterar prioridade', ['Nova prioridade', 'Baixa'], (api: TicketsApi) => expect(api.changePriority).toHaveBeenCalledWith('t-1', 'Low')],
@@ -141,6 +155,45 @@ describe('TicketDetailView', () => {
       expect(api.respond).toHaveBeenCalledWith('t-1', 'Ainda não funciona')
       await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2))
       expect(screen.getByLabelText('Sua resposta')).toHaveValue('')
+    })
+  })
+
+  describe('closing', () => {
+    it('asks what was done in a dialog before closing', async () => {
+      const { api } = await renderLoadedDetail(assignedAgent, openTicket)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Fechar chamado' }))
+      const dialog = screen.getByRole('dialog', { name: 'Fechar chamado' })
+      expect(within(dialog).getByText(/Tempo de atendimento/)).toBeInTheDocument()
+      await userEvent.type(within(dialog).getByLabelText('O que foi feito'), 'Troquei o toner')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar fechamento' }))
+
+      expect(api.close).toHaveBeenCalledWith('t-1', 'Troquei o toner')
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(api.get).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not close without saying what was done', async () => {
+      const { api } = await renderLoadedDetail(assignedAgent, openTicket)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Fechar chamado' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Confirmar fechamento' }))
+
+      expect(screen.getByText('Descreva o que foi feito')).toBeInTheDocument()
+      expect(api.close).not.toHaveBeenCalled()
+    })
+
+    it('shows the closing report of a closed ticket', async () => {
+      await renderLoadedDetail(requester, {
+        ...openTicket,
+        status: 'Closed',
+        closed_at: '2026-09-23T15:15:00Z',
+        resolution: 'Troquei o toner',
+      })
+
+      const report = screen.getByRole('region', { name: 'Relatório de fechamento' })
+      expect(report).toHaveTextContent('Troquei o toner')
+      expect(report).toHaveTextContent('Tempo até fechar: 1 dia e 2 h')
     })
   })
 

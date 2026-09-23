@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/vue'
+import userEvent from '@testing-library/user-event'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { authServiceKey } from '../auth/authService'
@@ -12,10 +13,10 @@ import TicketsView from './TicketsView.vue'
 const tickets: Ticket[] = [
   { ticket_id: 't-1', title: 'Impressora', description: 'x', status: 'Open', priority: 'High', created_at: '2026-09-22T13:00:00Z' },
   { ticket_id: 't-2', title: 'Cadeira', description: 'x', status: 'In Progress', priority: 'Low', assignee_id: 'agent-1', created_at: '2026-09-21T13:00:00Z' },
-  { ticket_id: 't-3', title: 'Monitor', description: 'x', status: 'Closed', assignee_id: 'agent-2', created_at: '2026-09-20T13:00:00Z' },
+  { ticket_id: 't-3', title: 'Monitor', description: 'x', status: 'Closed', assignee_id: 'agent-2', created_at: '2026-09-20T13:00:00Z', closed_at: '2026-09-21T15:00:00Z' },
 ]
 
-async function renderTicketsAt(url: string, list: TicketsApi['list']) {
+async function renderTicketsAt(url: string, list: TicketsApi['list'], overrides: Partial<TicketsApi> = {}) {
   const session = createSession()
   session.start({ id: 'admin-1', name: 'Administradora', role: 'admin' })
   const router = createRouter({
@@ -26,6 +27,7 @@ async function renderTicketsAt(url: string, list: TicketsApi['list']) {
   const api = fakeTicketsApi({
     list,
     responsibles: vi.fn().mockResolvedValue([{ id: 'agent-1', name: 'Ana Souza' }]),
+    ...overrides,
   })
   render(TicketsView, {
     global: {
@@ -33,7 +35,7 @@ async function renderTicketsAt(url: string, list: TicketsApi['list']) {
       provide: { [sessionKey]: session, [authServiceKey]: fakeAuthService(), [ticketsApiKey]: api },
     },
   })
-  return { router, session }
+  return { router, session, api }
 }
 
 function rowTexts(): string[][] {
@@ -48,10 +50,16 @@ describe('TicketsView', () => {
 
     await screen.findByText('Impressora')
     expect(rowTexts()).toEqual([
-      ['Impressora', 'Aberto', 'Alta', '—', '22/09/2026'],
-      ['Cadeira', 'Em andamento', 'Baixa', 'Ana Souza', '21/09/2026'],
-      ['Monitor', 'Fechado', '—', 'agent-2', '20/09/2026'],
+      ['Impressora', 'Aberto', 'Alta', '—', '22/09/2026', '—'],
+      ['Cadeira', 'Em andamento', 'Baixa', 'Ana Souza', '21/09/2026', '—'],
+      ['Monitor', 'Fechado', '—', 'agent-2', '20/09/2026', '21/09/2026'],
     ])
+  })
+
+  it('goes back to the home of the logged in role', async () => {
+    await renderTicketsAt(paths.tickets, vi.fn().mockResolvedValue([]))
+
+    expect(screen.getByRole('link', { name: '← Voltar' })).toHaveAttribute('href', '/admin')
   })
 
   it('links each ticket to its details', async () => {
@@ -79,5 +87,21 @@ describe('TicketsView', () => {
 
     await waitFor(() => expect(router.currentRoute.value.path).toBe(paths.login))
     expect(session.isAuthenticated.value).toBe(false)
+  })
+
+  it('opens a ticket in a dialog and refreshes the list right away', async () => {
+    const list = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([tickets[0]])
+    const { api } = await renderTicketsAt(paths.tickets, list, { open: vi.fn().mockResolvedValue('t-1') })
+    await screen.findByText('Nenhum chamado encontrado')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir novo chamado' }))
+    const dialog = screen.getByRole('dialog', { name: 'Abrir novo chamado' })
+    await userEvent.type(within(dialog).getByLabelText('Título'), 'Impressora')
+    await userEvent.type(within(dialog).getByLabelText('Descrição'), 'Não imprime')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abrir chamado' }))
+
+    expect(api.open).toHaveBeenCalled()
+    expect(await screen.findByRole('link', { name: 'Impressora' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

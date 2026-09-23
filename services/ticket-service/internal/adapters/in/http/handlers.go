@@ -23,6 +23,7 @@ func (h *Handler) OpenTicket(c *gin.Context) {
 	}
 
 	output, err := h.useCases.OpenTicket.Execute(c.Request.Context(), command.OpenTicketInput{
+		Actor:       ActorFrom(c),
 		Title:       body.Title,
 		Description: body.Description,
 		AssigneeID:  body.AssigneeID,
@@ -32,12 +33,13 @@ func (h *Handler) OpenTicket(c *gin.Context) {
 }
 
 func (h *Handler) ListTickets(c *gin.Context) {
-	output, err := h.useCases.ListTickets.Execute(c.Request.Context())
+	output, err := h.useCases.ListTickets.Execute(c.Request.Context(), ActorFrom(c))
 	respondJSON(c, http.StatusOK, output, err)
 }
 
 func (h *Handler) GetTicket(c *gin.Context) {
 	output, err := h.useCases.GetTicket.Execute(c.Request.Context(), query.GetTicketInput{
+		Viewer:   ActorFrom(c),
 		TicketID: c.Param("id"),
 	})
 	respondJSON(c, http.StatusOK, output, err)
@@ -55,6 +57,7 @@ func (h *Handler) EditTicket(c *gin.Context) {
 	}
 
 	err := h.useCases.EditTicket.Execute(c.Request.Context(), command.EditTicketInput{
+		Actor:       ActorFrom(c),
 		TicketID:    c.Param("id"),
 		Title:       body.Title,
 		Description: body.Description,
@@ -73,6 +76,7 @@ func (h *Handler) AssignTicket(c *gin.Context) {
 	}
 
 	err := h.useCases.AssignTicket.Execute(c.Request.Context(), command.AssignTicketInput{
+		Actor:      ActorFrom(c),
 		TicketID:   c.Param("id"),
 		AssigneeID: body.AssigneeID,
 	})
@@ -81,6 +85,7 @@ func (h *Handler) AssignTicket(c *gin.Context) {
 
 func (h *Handler) AutoAssignTicket(c *gin.Context) {
 	output, err := h.useCases.AutoAssignTicket.Execute(c.Request.Context(), command.AutoAssignTicketInput{
+		Actor:    ActorFrom(c),
 		TicketID: c.Param("id"),
 	})
 	respondJSON(c, http.StatusOK, output, err)
@@ -97,6 +102,7 @@ func (h *Handler) ChangeTicketPriority(c *gin.Context) {
 	}
 
 	err := h.useCases.ChangeTicketPriority.Execute(c.Request.Context(), command.ChangeTicketPriorityInput{
+		Actor:    ActorFrom(c),
 		TicketID: c.Param("id"),
 		Priority: body.Priority,
 	})
@@ -105,21 +111,32 @@ func (h *Handler) ChangeTicketPriority(c *gin.Context) {
 
 func (h *Handler) MoveTicketToInProgress(c *gin.Context) {
 	err := h.useCases.MoveTicketToInProgress.Execute(c.Request.Context(), command.MoveTicketToInProgressInput{
+		Actor:    ActorFrom(c),
 		TicketID: c.Param("id"),
 	})
 	respondNoContent(c, err)
 }
 
+type closeTicketRequest struct {
+	Resolution string `json:"resolution"`
+}
+
 func (h *Handler) CloseTicket(c *gin.Context) {
+	var body closeTicketRequest
+	if !bindJSON(c, &body) {
+		return
+	}
+
 	err := h.useCases.CloseTicket.Execute(c.Request.Context(), command.CloseTicketInput{
-		TicketID: c.Param("id"),
+		Actor:      ActorFrom(c),
+		TicketID:   c.Param("id"),
+		Resolution: body.Resolution,
 	})
 	respondNoContent(c, err)
 }
 
 type addTicketResponseRequest struct {
-	AuthorID string `json:"author_id"`
-	Content  string `json:"content"`
+	Content string `json:"content"`
 }
 
 func (h *Handler) AddTicketResponse(c *gin.Context) {
@@ -129,9 +146,28 @@ func (h *Handler) AddTicketResponse(c *gin.Context) {
 	}
 
 	err := h.useCases.AddTicketResponse.Execute(c.Request.Context(), command.AddTicketResponseInput{
+		Actor:    ActorFrom(c),
 		TicketID: c.Param("id"),
-		AuthorID: body.AuthorID,
 		Content:  body.Content,
 	})
 	respondNoContent(c, err)
+}
+
+func (h *Handler) ListResponsibles(c *gin.Context) {
+	output, err := h.useCases.ListResponsibles.Execute(c.Request.Context())
+	respondJSON(c, http.StatusOK, output, err)
+}
+
+func (h *Handler) ListNotifications(c *gin.Context) {
+	output, err := h.useCases.ListNotifications.Execute(c.Request.Context(), ActorFrom(c))
+	respondJSON(c, http.StatusOK, output, err)
+}
+
+func (h *Handler) MarkNotificationsRead(c *gin.Context) {
+	respondNoContent(c, h.useCases.MarkNotificationsRead.Execute(c.Request.Context(), ActorFrom(c)))
+}
+
+func (h *Handler) SupportWorkload(c *gin.Context) {
+	output, err := h.useCases.SupportWorkload.Execute(c.Request.Context(), ActorFrom(c))
+	respondJSON(c, http.StatusOK, output, err)
 }

@@ -6,11 +6,13 @@ import (
 
 type TicketClosed struct {
 	baseEvent
+	Resolution string
 }
 
-func NewTicketClosed(id *valueobjects.ID) TicketClosed {
+func NewTicketClosed(id *valueobjects.ID, resolution string) TicketClosed {
 	return TicketClosed{
-		baseEvent: newBaseEvent(id.GetID()),
+		baseEvent:  newBaseEvent(id.GetID()),
+		Resolution: resolution,
 	}
 }
 

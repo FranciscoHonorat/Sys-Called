@@ -16,6 +16,7 @@ var frameworkImports = []string{
 	"github.com/gin-gonic/",
 	"github.com/jackc/pgx/",
 	"github.com/segmentio/kafka-go",
+	"github.com/golang-jwt/jwt",
 }
 
 func TestDependencyRule(t *testing.T) {

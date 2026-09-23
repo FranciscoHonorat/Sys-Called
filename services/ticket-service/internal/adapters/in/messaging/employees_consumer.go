@@ -14,13 +14,24 @@ type responsibleSyncer interface {
 	Execute(ctx context.Context, input command.SyncResponsibleInput) error
 }
 
+type accountNotifier interface {
+	Execute(ctx context.Context, input command.AccountRequestInput) error
+}
+
 type EmployeesConsumer struct {
 	reader          *kafka.Reader
 	syncResponsible responsibleSyncer
+	notifyAccount   accountNotifier
 }
 
-func NewEmployeesConsumer(reader *kafka.Reader, syncResponsible responsibleSyncer) *EmployeesConsumer {
-	return &EmployeesConsumer{reader: reader, syncResponsible: syncResponsible}
+func NewEmployeesConsumer(reader *kafka.Reader, syncResponsible responsibleSyncer, notifyAccount accountNotifier) *EmployeesConsumer {
+	return &EmployeesConsumer{reader: reader, syncResponsible: syncResponsible, notifyAccount: notifyAccount}
+}
+
+type employeePayload struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Role string `json:"role"`
 }
 
 func (c *EmployeesConsumer) Run(ctx context.Context) {
@@ -40,20 +51,26 @@ func (c *EmployeesConsumer) Run(ctx context.Context) {
 	}
 }
 
+var accountRequests = map[string]command.AccountRequest{
+	"EmployeeSignedUp":       command.AccountSignUp,
+	"PasswordResetRequested": command.AccountPasswordReset,
+}
+
 func (c *EmployeesConsumer) Handle(ctx context.Context, msg kafka.Message) error {
-	switch headerValue(msg.Headers, "event_type") {
-	case "EmployeeRegistered":
-		var payload struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		}
-		if err := json.Unmarshal(msg.Value, &payload); err != nil {
-			return err
-		}
-		return c.syncResponsible.Execute(ctx, command.SyncResponsibleInput{ID: payload.ID, Name: payload.Name})
-	default:
+	eventType := headerValue(msg.Headers, "event_type")
+	request, isAccountRequest := accountRequests[eventType]
+	if eventType != "EmployeeRegistered" && !isAccountRequest {
 		return nil
 	}
+
+	var payload employeePayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return err
+	}
+	if isAccountRequest {
+		return c.notifyAccount.Execute(ctx, command.AccountRequestInput{Kind: request, EmployeeID: payload.ID, Name: payload.Name})
+	}
+	return c.syncResponsible.Execute(ctx, command.SyncResponsibleInput{ID: payload.ID, Name: payload.Name, Role: payload.Role})
 }
 
 func headerValue(headers []kafka.Header, key string) string {

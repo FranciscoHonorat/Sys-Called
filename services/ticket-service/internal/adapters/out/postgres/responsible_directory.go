@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,6 +32,25 @@ func (d *ResponsibleDirectory) List(ctx context.Context) ([]string, error) {
 	}
 
 	return ids, rows.Err()
+}
+
+func (d *ResponsibleDirectory) ListWithNames(ctx context.Context) ([]out.Responsible, error) {
+	rows, err := d.pool.Query(ctx, `SELECT id, name FROM responsibles ORDER BY registered_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var responsibles []out.Responsible
+	for rows.Next() {
+		var r out.Responsible
+		if err := rows.Scan(&r.ID, &r.Name); err != nil {
+			return nil, err
+		}
+		responsibles = append(responsibles, r)
+	}
+
+	return responsibles, rows.Err()
 }
 
 func (d *ResponsibleDirectory) Upsert(ctx context.Context, id, name string) error {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"log"
 	"net/http"
 	"os"
@@ -16,15 +17,24 @@ import (
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/in/outbox"
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/out/messaging"
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/out/postgres"
+	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/adapters/out/security"
 	"github.com/franciscoHonorat/Sys-Called/services/employees-service/internal/application"
 )
 
-const outboxRelayInterval = time.Second
+const (
+	outboxRelayInterval = time.Second
+	accessTokenTTL      = 15 * time.Minute
+	refreshTokenTTL     = 7 * 24 * time.Hour
+)
+
+const seedPassword = "senha123"
 
 var seedEmployees = []application.RegisterEmployeeInput{
-	{ID: "agent-1", Name: "Ana Souza"},
-	{ID: "agent-2", Name: "Bruno Lima"},
-	{ID: "agent-3", Name: "Carla Melo"},
+	{ID: "agent-1", Name: "Ana Souza", Username: "ana", Password: seedPassword, Role: "support"},
+	{ID: "agent-2", Name: "Bruno Lima", Username: "bruno", Password: seedPassword, Role: "support"},
+	{ID: "agent-3", Name: "Carla Melo", Username: "carla", Password: seedPassword, Role: "support"},
+	{ID: "admin-1", Name: "Administradora", Username: "admin", Password: seedPassword, Role: "admin"},
+	{ID: "user-1", Name: "Usuário Padrão", Username: "usuario", Password: seedPassword, Role: "user"},
 }
 
 func main() {
@@ -52,9 +62,18 @@ func main() {
 	}
 	defer pool.Close()
 
-	repo := postgres.NewEmployeeRepository(pool)
+	signingKey, generated, err := security.LoadSigningKey(os.Getenv("JWT_PRIVATE_KEY"))
+	if err != nil {
+		log.Fatalf("failed to load JWT signing key: %v", err)
+	}
+	if generated {
+		log.Println("JWT_PRIVATE_KEY not set: using an ephemeral signing key, tokens will not survive a restart")
+	}
 
-	registerEmployee := application.NewRegisterEmployeeUseCase(repo)
+	repo := postgres.NewEmployeeRepository(pool)
+	hasher := security.NewBcryptHasher()
+
+	registerEmployee := application.NewRegisterEmployeeUseCase(repo, hasher)
 	for _, seed := range seedEmployees {
 		if err := registerEmployee.Execute(ctx, seed); err != nil {
 			log.Fatalf("failed to seed employee %s: %v", seed.ID, err)
@@ -71,7 +90,27 @@ func main() {
 	relay := outbox.NewRelay(application.NewPublishPendingEventsUseCase(postgres.NewOutboxStore(pool), messaging.NewKafkaPublisher(writer)))
 	go relay.Run(ctx, outboxRelayInterval)
 
-	handler := httpapi.NewHandler(application.NewListEmployeesUseCase(repo))
+	tokenIssuer := security.NewJWTIssuer(signingKey, accessTokenTTL)
+	sessions := application.NewSessions(
+		tokenIssuer,
+		security.NewRefreshTokenGenerator(),
+		postgres.NewRefreshTokenStore(pool),
+		refreshTokenTTL,
+		time.Now,
+	)
+	handler := httpapi.NewHandler(httpapi.UseCases{
+		Authenticate:           application.NewAuthenticateUseCase(security.NewJWTVerifier(signingKey.Public().(ed25519.PublicKey))),
+		ListEmployees:          application.NewListEmployeesUseCase(repo),
+		Login:                  application.NewLoginUseCase(repo, hasher, sessions),
+		RefreshSession:         application.NewRefreshSessionUseCase(repo, sessions),
+		Logout:                 application.NewLogoutUseCase(sessions),
+		PublicKeys:             application.NewGetPublicKeysUseCase(tokenIssuer),
+		SignUp:                 application.NewSignUpUseCase(repo, hasher),
+		RequestPasswordReset:   application.NewRequestPasswordResetUseCase(repo),
+		ApproveEmployee:        application.NewApproveEmployeeUseCase(repo),
+		IssueTemporaryPassword: application.NewIssueTemporaryPasswordUseCase(repo, hasher, security.NewTemporaryPasswordGenerator(), sessions),
+		ChangePassword:         application.NewChangePasswordUseCase(repo, hasher),
+	})
 	router := httpapi.NewRouter(handler)
 
 	srv := &http.Server{

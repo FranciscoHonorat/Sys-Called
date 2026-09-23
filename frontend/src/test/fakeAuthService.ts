@@ -7,6 +7,9 @@ export function fakeAuthService(overrides: Partial<AuthService> = {}): AuthServi
     login: vi.fn(),
     restore: vi.fn().mockResolvedValue(null),
     logout: vi.fn().mockResolvedValue(undefined),
+    signUp: vi.fn().mockResolvedValue(undefined),
+    requestPasswordReset: vi.fn().mockResolvedValue(undefined),
+    changePassword: vi.fn(),
     ...overrides,
   }
 }

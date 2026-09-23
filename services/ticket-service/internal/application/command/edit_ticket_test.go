@@ -18,6 +18,7 @@ func TestEditTicketUseCase(t *testing.T) {
 		uc := command.NewEditTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.EditTicketInput{
+			Actor:       testUser,
 			TicketID:    ticketID,
 			Title:       "New Title",
 			Description: "New Description",
@@ -35,6 +36,7 @@ func TestEditTicketUseCase(t *testing.T) {
 		uc := command.NewEditTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.EditTicketInput{
+			Actor:       testUser,
 			TicketID:    "00000000-0000-0000-0000-000000000001",
 			Title:       "New Title",
 			Description: "New Description",
@@ -49,6 +51,7 @@ func TestEditTicketUseCase(t *testing.T) {
 		uc := command.NewEditTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.EditTicketInput{
+			Actor:       testUser,
 			TicketID:    ticketID,
 			Title:       "",
 			Description: "New Description",
@@ -60,13 +63,16 @@ func TestEditTicketUseCase(t *testing.T) {
 	t.Run("should return an error when editing a closed ticket", func(t *testing.T) {
 		store := outtest.NewEventStore()
 		cache := newTestCache()
-		ticketID := openTestTicket(t, store)
+		ticketID := openAssignedTicket(t, store)
 		assert.NoError(t, command.NewCloseTicketUseCase(store, cache).Execute(context.Background(), command.CloseTicketInput{
-			TicketID: ticketID,
+			Resolution: "Resolvido",
+			Actor:      assignedAgent,
+			TicketID:   ticketID,
 		}))
 
 		uc := command.NewEditTicketUseCase(store, cache)
 		err := uc.Execute(context.Background(), command.EditTicketInput{
+			Actor:       testAdmin,
 			TicketID:    ticketID,
 			Title:       "New Title",
 			Description: "New Description",

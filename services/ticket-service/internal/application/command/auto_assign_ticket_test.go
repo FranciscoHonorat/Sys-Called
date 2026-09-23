@@ -22,16 +22,18 @@ func TestAutoAssignTicketUseCase(t *testing.T) {
 		third := openTestTicket(t, store)
 
 		require.NoError(t, command.NewAssignTicketUseCase(store, cache).Execute(context.Background(), command.AssignTicketInput{
+			Actor:    testAdmin,
 			TicketID: first, AssigneeID: "agent-1",
 		}))
 		require.NoError(t, command.NewAssignTicketUseCase(store, cache).Execute(context.Background(), command.AssignTicketInput{
+			Actor:    testAdmin,
 			TicketID: second, AssigneeID: "agent-2",
 		}))
 
 		responsibles := &outtest.ResponsibleDirectory{Responsibles: []string{"agent-1", "agent-2", "agent-3"}}
 		uc := command.NewAutoAssignTicketUseCase(store, cache, responsibles)
 
-		output, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{TicketID: third})
+		output, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{Actor: testAdmin, TicketID: third})
 
 		require.NoError(t, err)
 		assert.Equal(t, "agent-3", output.AssigneeID)
@@ -45,16 +47,19 @@ func TestAutoAssignTicketUseCase(t *testing.T) {
 		target := openTestTicket(t, store)
 
 		require.NoError(t, command.NewAssignTicketUseCase(store, cache).Execute(context.Background(), command.AssignTicketInput{
+			Actor:    testAdmin,
 			TicketID: busy, AssigneeID: "agent-1",
 		}))
 		require.NoError(t, command.NewCloseTicketUseCase(store, cache).Execute(context.Background(), command.CloseTicketInput{
-			TicketID: busy,
+			Resolution: "Resolvido",
+			Actor:      assignedAgent,
+			TicketID:   busy,
 		}))
 
 		responsibles := &outtest.ResponsibleDirectory{Responsibles: []string{"agent-1", "agent-2"}}
 		uc := command.NewAutoAssignTicketUseCase(store, cache, responsibles)
 
-		output, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{TicketID: target})
+		output, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{Actor: testAdmin, TicketID: target})
 
 		require.NoError(t, err)
 		assert.Equal(t, "agent-1", output.AssigneeID)
@@ -68,7 +73,7 @@ func TestAutoAssignTicketUseCase(t *testing.T) {
 		responsibles := &outtest.ResponsibleDirectory{Responsibles: nil}
 		uc := command.NewAutoAssignTicketUseCase(store, cache, responsibles)
 
-		_, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{TicketID: ticketID})
+		_, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{Actor: testAdmin, TicketID: ticketID})
 
 		assert.ErrorIs(t, err, domainErr.ErrNoResponsiblesAvailable)
 	})
@@ -78,7 +83,7 @@ func TestAutoAssignTicketUseCase(t *testing.T) {
 		responsibles := &outtest.ResponsibleDirectory{Responsibles: []string{"agent-1"}}
 		uc := command.NewAutoAssignTicketUseCase(store, newTestCache(), responsibles)
 
-		_, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{TicketID: "not-a-uuid"})
+		_, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{Actor: testAdmin, TicketID: "not-a-uuid"})
 
 		assert.ErrorIs(t, err, domainErr.ErrInvalidUUID)
 	})
@@ -88,7 +93,7 @@ func TestAutoAssignTicketUseCase(t *testing.T) {
 		responsibles := &outtest.ResponsibleDirectory{Responsibles: []string{"agent-1"}}
 		uc := command.NewAutoAssignTicketUseCase(store, newTestCache(), responsibles)
 
-		_, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{TicketID: "00000000-0000-0000-0000-000000000001"})
+		_, err := uc.Execute(context.Background(), command.AutoAssignTicketInput{Actor: testAdmin, TicketID: "00000000-0000-0000-0000-000000000001"})
 
 		assert.ErrorIs(t, err, domainErr.ErrEventStreamNotFound)
 	})

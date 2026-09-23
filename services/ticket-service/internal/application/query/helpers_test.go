@@ -19,6 +19,7 @@ func openTestTicket(t *testing.T, store *outtest.EventStore) string {
 	t.Helper()
 
 	output, err := command.NewOpenTicketUseCase(store, newTestCache()).Execute(context.Background(), command.OpenTicketInput{
+		Actor:       testUser,
 		Title:       "Valid Title",
 		Description: "Valid Description",
 	})
@@ -26,3 +27,7 @@ func openTestTicket(t *testing.T, store *outtest.EventStore) string {
 
 	return output.TicketID
 }
+
+var testUser = outtest.Actor("user-1", "user")
+
+var testAdmin = outtest.Actor("admin-1", "admin")

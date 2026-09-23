@@ -18,8 +18,8 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 		uc := command.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AddTicketResponseInput{
+			Actor:    testUser,
 			TicketID: ticketID,
-			AuthorID: "agent-1",
 			Content:  "Valid response content",
 		})
 
@@ -28,6 +28,7 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 		tk := reloadTestTicket(t, store, ticketID)
 		assert.Len(t, tk.GetResponses(), 1)
 		assert.Equal(t, "Valid response content", tk.GetResponses()[0].GetContent().GetContent())
+		assert.Equal(t, testUser.ID(), tk.GetResponses()[0].GetAuthorID().GetAuthorID())
 	})
 
 	t.Run("should return an error when the ticket does not exist", func(t *testing.T) {
@@ -35,8 +36,8 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 		uc := command.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AddTicketResponseInput{
+			Actor:    testUser,
 			TicketID: "00000000-0000-0000-0000-000000000001",
-			AuthorID: "agent-1",
 			Content:  "Valid response content",
 		})
 
@@ -49,8 +50,8 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 		uc := command.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AddTicketResponseInput{
+			Actor:    testUser,
 			TicketID: ticketID,
-			AuthorID: "agent-1",
 			Content:  "",
 		})
 
@@ -59,13 +60,13 @@ func TestAddTicketResponseUseCase(t *testing.T) {
 
 	t.Run("should return an error when adding a response to a closed ticket", func(t *testing.T) {
 		store := outtest.NewEventStore()
-		ticketID := openTestTicket(t, store)
-		assert.NoError(t, command.NewCloseTicketUseCase(store, newTestCache()).Execute(context.Background(), command.CloseTicketInput{TicketID: ticketID}))
+		ticketID := openAssignedTicket(t, store)
+		assert.NoError(t, command.NewCloseTicketUseCase(store, newTestCache()).Execute(context.Background(), command.CloseTicketInput{Resolution: "Resolvido", Actor: assignedAgent, TicketID: ticketID}))
 		uc := command.NewAddTicketResponseUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AddTicketResponseInput{
+			Actor:    testUser,
 			TicketID: ticketID,
-			AuthorID: "agent-1",
 			Content:  "Valid response content",
 		})
 

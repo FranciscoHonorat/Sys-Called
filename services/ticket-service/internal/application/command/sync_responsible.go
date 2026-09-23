@@ -10,6 +10,7 @@ import (
 type SyncResponsibleInput struct {
 	ID   string
 	Name string
+	Role string
 }
 
 type SyncResponsibleUseCase struct {
@@ -21,10 +22,20 @@ func NewSyncResponsibleUseCase(responsibles out.ResponsibleDirectory) *SyncRespo
 }
 
 func (uc *SyncResponsibleUseCase) Execute(ctx context.Context, input SyncResponsibleInput) error {
+	if !canAttendTickets(input.Role) {
+		return nil
+	}
+
 	id, err := valueobjects.NewAssigneeID(input.ID)
 	if err != nil {
 		return err
 	}
 
 	return uc.responsibles.Upsert(ctx, id.GetAssigneeID(), input.Name)
+}
+
+const supportRole = "support"
+
+func canAttendTickets(role string) bool {
+	return role == "" || role == supportRole
 }
