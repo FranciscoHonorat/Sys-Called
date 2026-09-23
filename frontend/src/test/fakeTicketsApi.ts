@@ -15,6 +15,9 @@ export function fakeTicketsApi(overrides: Partial<TicketsApi> = {}): TicketsApi 
     start: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     respond: vi.fn().mockResolvedValue(undefined),
+    notifications: vi.fn().mockResolvedValue({ unread: 0, items: [] }),
+    markNotificationsRead: vi.fn().mockResolvedValue(undefined),
+    supportWorkload: vi.fn().mockResolvedValue([]),
     ...overrides,
   }
 }

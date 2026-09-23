@@ -13,6 +13,9 @@ export function resolveNavigation(user: User | null, to: Destination): true | st
   if (!user) {
     return isRestricted(to) ? paths.login : true
   }
+  if (user.mustChangePassword) {
+    return to.path === paths.changePassword ? true : paths.changePassword
+  }
   return isOutOfPlace(user, to) ? homePathFor(user.role) : true
 }
 

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/vue'
 import userEvent from '@testing-library/user-event'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { authServiceKey, type AuthService, type User } from '../auth/authService'
+import { AccountPendingError, authServiceKey, type AuthService, type User } from '../auth/authService'
 import { paths } from '../router/paths'
 import { fakeAuthService } from '../test/fakeAuthService'
 import LoginView from './LoginView.vue'
@@ -77,5 +77,14 @@ describe('LoginView', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Username ou senha inválidos')
     expect(emitted().authenticated).toBeUndefined()
+  })
+
+  it('explains that a new account still waits for the administrator', async () => {
+    const authService = fakeAuthService({ login: vi.fn().mockRejectedValue(new AccountPendingError()) })
+    renderLogin(authService)
+
+    await submitCredentials('maria', 'senha-forte')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sua conta ainda aguarda a aprovação do administrador')
   })
 })

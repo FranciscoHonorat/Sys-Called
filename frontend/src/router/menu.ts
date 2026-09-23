@@ -14,17 +14,13 @@ function ticketsWithStatus(status: TicketStatus): RouteLocationRaw {
 }
 
 const menus: Record<Role, MenuItem[]> = {
-  user: [
-    { label: 'Abrir novo chamado', to: paths.newTicket },
-    { label: 'Meus chamados', to: paths.tickets },
-  ],
+  user: [{ label: 'Meus chamados', to: paths.tickets }],
   support: [
     { label: 'Chamados abertos', to: ticketsWithStatus(TicketStatus.Open) },
     { label: 'Em atendimento', to: ticketsWithStatus(TicketStatus.InProgress) },
     { label: 'Fechados por mim', to: ticketsWithStatus(TicketStatus.Closed) },
   ],
   admin: [
-    { label: 'Abrir novo chamado', to: paths.newTicket },
     { label: 'Todos os chamados', to: paths.tickets },
     { label: 'Usuários', to: paths.users },
     { label: 'Suportes', to: paths.supports },

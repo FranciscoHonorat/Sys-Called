@@ -22,10 +22,12 @@ function ticket(status: Ticket['status'], assignee?: string): Ticket {
 describe('allowedActions', () => {
   it.each([
     ['requester', requester, ticket('Open', 'agent-1'), ['edit', 'respond']],
+    ['requester once the work started', requester, ticket('In Progress', 'agent-1'), ['respond']],
     ['assigned agent on an open ticket', assignedAgent, ticket('Open', 'agent-1'), ['manage', 'start', 'close', 'respond']],
     ['assigned agent on a ticket in progress', assignedAgent, ticket('In Progress', 'agent-1'), ['manage', 'close', 'respond']],
     ['another agent', anotherAgent, ticket('Open', 'agent-1'), ['manage', 'respond']],
-    ['admin', admin, ticket('Open'), ['edit', 'manage', 'start', 'close', 'respond']],
+    ['admin', admin, ticket('Open'), ['edit', 'manage', 'respond']],
+    ['admin on a ticket in progress', admin, ticket('In Progress', 'agent-1'), ['edit', 'manage', 'respond']],
     ['admin on a closed ticket', admin, ticket('Closed', 'agent-1'), []],
     ['requester on a closed ticket', requester, ticket('Closed', 'agent-1'), []],
   ] as const)('%s', (_, user, subject, expected) => {

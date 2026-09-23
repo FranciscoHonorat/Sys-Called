@@ -2,16 +2,20 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
+import { sessionKey } from '../auth/session'
 import { useSessionExit } from '../auth/useSessionExit'
-import AppHeader from '../components/AppHeader.vue'
+import NewTicketModal from '../components/NewTicketModal.vue'
+import PageLayout from '../components/PageLayout.vue'
 import { paths, ticketDetailPath } from '../router/paths'
 import { formatDate } from '../tickets/format'
+import { canOpenTickets } from '../tickets/permissions'
 import { priorityLabel } from '../tickets/priority'
 import { nameResolver } from '../tickets/responsibles'
 import { statusLabel, TicketStatus } from '../tickets/status'
 import { SessionExpiredError, ticketsApiKey, type Responsible, type Ticket } from '../tickets/ticketsApi'
 
 const api = inject(ticketsApiKey)!
+const session = inject(sessionKey)!
 const { expire } = useSessionExit()
 const route = useRoute()
 
@@ -33,6 +37,14 @@ const visible = computed(() =>
   currentStatus.value ? tickets.value.filter((t) => t.status === currentStatus.value) : tickets.value,
 )
 
+const creating = ref(false)
+const canOpen = computed(() => (session.user.value ? canOpenTickets(session.user.value.role) : false))
+
+async function onOpened() {
+  creating.value = false
+  tickets.value = await api.list()
+}
+
 onMounted(async () => {
   try {
     const [list, people] = await Promise.all([api.list(), api.responsibles()])
@@ -48,11 +60,20 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="min-h-screen bg-slate-100 p-6">
-    <AppHeader />
+  <PageLayout back>
 
     <section class="rounded-lg bg-white p-6 shadow">
-      <h2 class="mb-4 text-xl font-semibold text-slate-800">Chamados</h2>
+      <div class="mb-4 flex items-center justify-between gap-4">
+        <h2 class="text-xl font-semibold text-slate-800">Chamados</h2>
+        <button
+          v-if="canOpen"
+          type="button"
+          class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          @click="creating = true"
+        >
+          Abrir novo chamado
+        </button>
+      </div>
 
       <nav class="mb-4 flex gap-2 text-sm">
         <RouterLink
@@ -84,6 +105,7 @@ onMounted(async () => {
             <th>Prioridade</th>
             <th>Responsável</th>
             <th>Aberto em</th>
+            <th>Fechado em</th>
           </tr>
         </thead>
         <tbody>
@@ -95,9 +117,11 @@ onMounted(async () => {
             <td>{{ priorityLabel(ticket.priority) }}</td>
             <td>{{ nameOf(ticket.assignee_id) }}</td>
             <td>{{ formatDate(ticket.created_at) }}</td>
+            <td>{{ formatDate(ticket.closed_at) }}</td>
           </tr>
         </tbody>
       </table>
     </section>
-  </main>
+    <NewTicketModal :open="creating" @close="creating = false" @opened="onOpened" />
+  </PageLayout>
 </template>

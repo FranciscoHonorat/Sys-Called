@@ -1,4 +1,4 @@
-import type { User } from '../auth/authService'
+import type { Role, User } from '../auth/authService'
 import { TicketStatus } from './status'
 import type { Ticket } from './ticketsApi'
 
@@ -12,13 +12,18 @@ export function allowedActions(ticket: Ticket, user: User): TicketAction[] {
   const isAdmin = user.role === 'admin'
   const isSupport = user.role === 'support'
   const isRequester = ticket.requester_id === user.id
-  const worksOnIt = isAdmin || (isSupport && ticket.assignee_id === user.id)
+  const isOpen = ticket.status === TicketStatus.Open
+  const worksOnIt = isSupport && ticket.assignee_id === user.id
   const rules: Array<[TicketAction, boolean]> = [
-    ['edit', isAdmin || isRequester],
+    ['edit', isAdmin || (isRequester && isOpen)],
     ['manage', isAdmin || isSupport],
-    ['start', worksOnIt && ticket.status === TicketStatus.Open],
+    ['start', worksOnIt && isOpen],
     ['close', worksOnIt],
     ['respond', true],
   ]
   return rules.filter(([, allowed]) => allowed).map(([action]) => action)
+}
+
+export function canOpenTickets(role: Role): boolean {
+  return role !== 'support'
 }

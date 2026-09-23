@@ -14,6 +14,6 @@ export function validateCredentials(username: string, password: string): Credent
   return errors
 }
 
-export function hasErrors(errors: CredentialErrors): boolean {
+export function hasErrors(errors: object): boolean {
   return Object.keys(errors).length > 0
 }

@@ -38,4 +38,15 @@ describe('resolveNavigation', () => {
   it('skips the login for someone already logged in', () => {
     expect(resolveNavigation(admin, loginPage)).toBe(paths.adminHome)
   })
+
+  it('keeps someone with a temporary password on the page to choose a new one', () => {
+    const temporary: User = { ...agent, mustChangePassword: true }
+    const changePasswordPage = { path: paths.changePassword, meta: { requiresAuth: true } }
+
+    expect(resolveNavigation(temporary, adminArea)).toBe(paths.changePassword)
+    expect(resolveNavigation(temporary, { path: paths.tickets, meta: { requiresAuth: true } })).toBe(paths.changePassword)
+    expect(resolveNavigation(temporary, changePasswordPage)).toBe(true)
+    expect(resolveNavigation(agent, changePasswordPage)).toBe(true)
+    expect(resolveNavigation(null, changePasswordPage)).toBe(paths.login)
+  })
 })
