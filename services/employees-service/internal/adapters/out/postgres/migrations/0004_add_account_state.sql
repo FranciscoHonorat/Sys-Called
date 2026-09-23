@@ -1,0 +1,3 @@
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS password_reset_requested BOOLEAN NOT NULL DEFAULT false;

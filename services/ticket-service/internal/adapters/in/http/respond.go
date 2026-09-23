@@ -56,8 +56,11 @@ func statusForError(err error) int {
 		errors.Is(err, domainErr.ErrInvalidContent),
 		errors.Is(err, domainErr.ErrInvalidAuthorID),
 		errors.Is(err, domainErr.ErrInvalidTicketID),
-		errors.Is(err, domainErr.ErrInvalidResponse):
+		errors.Is(err, domainErr.ErrInvalidResponse),
+		errors.Is(err, domainErr.ErrInvalidResolution):
 		return http.StatusBadRequest
+	case errors.Is(err, domainErr.ErrForbidden):
+		return http.StatusForbidden
 	case errors.Is(err, domainErr.ErrNoResponsiblesAvailable):
 		return http.StatusUnprocessableEntity
 	default:

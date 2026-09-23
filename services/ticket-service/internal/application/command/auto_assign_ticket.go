@@ -5,12 +5,14 @@ import (
 
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/actor"
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/valueobjects"
 )
 
 type AutoAssignTicketInput struct {
+	Actor    actor.Actor
 	TicketID string
 }
 
@@ -32,7 +34,7 @@ func NewAutoAssignTicketUseCase(store out.EventStore, cache out.TicketCache, res
 
 func (uc *AutoAssignTicketUseCase) Execute(ctx context.Context, input AutoAssignTicketInput) (AutoAssignTicketOutput, error) {
 	var chosenID string
-	err := uc.UpdateTicket(ctx, input.TicketID, func(t *ticket.Ticket) error {
+	err := uc.UpdateTicket(ctx, input.Actor, input.TicketID, ticket.CanManage, func(t *ticket.Ticket) error {
 		candidates, err := uc.responsibles.List(ctx)
 		if err != nil {
 			return err

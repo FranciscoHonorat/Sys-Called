@@ -5,11 +5,14 @@ import (
 
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/actor"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 )
 
 type CloseTicketInput struct {
-	TicketID string
+	Actor      actor.Actor
+	TicketID   string
+	Resolution string
 }
 
 type CloseTicketUseCase struct {
@@ -21,7 +24,7 @@ func NewCloseTicketUseCase(store out.EventStore, cache out.TicketCache) *CloseTi
 }
 
 func (uc *CloseTicketUseCase) Execute(ctx context.Context, input CloseTicketInput) error {
-	return uc.UpdateTicket(ctx, input.TicketID, func(t *ticket.Ticket) error {
-		return t.Close()
+	return uc.UpdateTicket(ctx, input.Actor, input.TicketID, ticket.CanWork, func(t *ticket.Ticket) error {
+		return t.Close(input.Resolution)
 	})
 }

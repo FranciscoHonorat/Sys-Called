@@ -12,6 +12,7 @@ var (
 	ErrInvalidUUID        = errors.New("invalid UUID: UUID cannot be empty")
 
 	ErrTicketAlreadyClosed     = errors.New("invalid operation: ticket is already closed")
+	ErrInvalidResolution       = errors.New("invalid resolution: describe what was done to close the ticket")
 	ErrInvalidStatusTransition = errors.New("invalid status transition")
 
 	ErrInvalidContent  = errors.New("invalid content: content cannot be empty")
@@ -30,4 +31,9 @@ var (
 	ErrUnknownEventType = errors.New("event: unknown event type")
 
 	ErrNoResponsiblesAvailable = errors.New("no responsibles available for automatic assignment")
+
+	ErrInvalidRequester = errors.New("invalid requester: someone must open the ticket")
+	ErrInvalidActor     = errors.New("invalid actor: an ID and a known role are required")
+	ErrUnauthenticated  = errors.New("unauthenticated")
+	ErrForbidden        = errors.New("forbidden: you are not allowed to perform this action")
 )

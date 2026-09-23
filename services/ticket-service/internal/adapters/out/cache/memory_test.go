@@ -23,7 +23,7 @@ func newTestTicket(t *testing.T) *ticket.Ticket {
 	description, err := valueobjects.NewDescription("Valid Description")
 	require.NoError(t, err)
 
-	tk, err := ticket.NewTicket(id, title, description, valueobjects.TicketStatusOpen, nil, nil)
+	tk, err := ticket.NewTicket(id, title, description, valueobjects.TicketStatusOpen, nil, nil, "user-1")
 	require.NoError(t, err)
 
 	return tk

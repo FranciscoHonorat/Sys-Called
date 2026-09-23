@@ -15,7 +15,10 @@ import (
 	httpapi "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/in/http"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/in/messaging"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/out/cache"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/out/jwks"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/adapters/out/postgres"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/auth"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/command"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/query"
 )
@@ -29,6 +32,11 @@ func main() {
 	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
 	if kafkaBrokers == "" {
 		log.Fatal("KAFKA_BROKERS is required")
+	}
+
+	jwksURL := os.Getenv("EMPLOYEES_JWKS_URL")
+	if jwksURL == "" {
+		log.Fatal("EMPLOYEES_JWKS_URL is required")
 	}
 
 	port := os.Getenv("PORT")
@@ -45,7 +53,8 @@ func main() {
 	}
 	defer pool.Close()
 
-	store := postgres.NewEventStore(pool)
+	notifications := postgres.NewNotificationStore(pool)
+	store := application.NewNotifyingEventStore(postgres.NewEventStore(pool), notifications)
 	ticketCache := cache.NewInMemoryTicketCache()
 	responsibles := postgres.NewResponsibleDirectory(pool)
 
@@ -56,10 +65,13 @@ func main() {
 	})
 	defer reader.Close()
 
-	consumer := messaging.NewEmployeesConsumer(reader, command.NewSyncResponsibleUseCase(responsibles))
+	consumer := messaging.NewEmployeesConsumer(reader, command.NewSyncResponsibleUseCase(responsibles), command.NewNotifyAccountRequestUseCase(notifications, time.Now))
 	go consumer.Run(ctx)
 
+	verifier := jwks.NewVerifier(jwksURL, &http.Client{Timeout: 5 * time.Second})
+
 	handler := httpapi.NewHandler(httpapi.UseCases{
+		Authenticate:           auth.NewAuthenticateUseCase(verifier),
 		OpenTicket:             command.NewOpenTicketUseCase(store, ticketCache),
 		GetTicket:              query.NewGetTicketUseCase(store, ticketCache),
 		ListTickets:            query.NewListTicketsUseCase(store, ticketCache),
@@ -70,6 +82,10 @@ func main() {
 		MoveTicketToInProgress: command.NewMoveTicketToInProgressUseCase(store, ticketCache),
 		CloseTicket:            command.NewCloseTicketUseCase(store, ticketCache),
 		AddTicketResponse:      command.NewAddTicketResponseUseCase(store, ticketCache),
+		ListResponsibles:       query.NewListResponsiblesUseCase(responsibles),
+		ListNotifications:      query.NewListNotificationsUseCase(notifications),
+		MarkNotificationsRead:  command.NewMarkNotificationsReadUseCase(notifications, time.Now),
+		SupportWorkload:        query.NewSupportWorkloadUseCase(store, ticketCache, responsibles),
 	})
 	router := httpapi.NewRouter(handler)
 

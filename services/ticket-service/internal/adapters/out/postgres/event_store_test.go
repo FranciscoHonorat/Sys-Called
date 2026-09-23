@@ -43,9 +43,9 @@ func TestEventStore(t *testing.T) {
 		description, err := valueobjects.NewDescription("Valid Description")
 		require.NoError(t, err)
 
-		opened := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil)
+		opened := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil, "user-1")
 
-		err = store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0)
+		err = store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0, "user-1")
 		assert.NoError(t, err)
 
 		loaded, err := store.Load(context.Background(), id.GetID())
@@ -57,6 +57,31 @@ func TestEventStore(t *testing.T) {
 		reopened, ok := loaded[0].(event.TicketOpened)
 		assert.True(t, ok)
 		assert.Equal(t, "Valid Title", reopened.Title)
+		assert.Equal(t, "user-1", reopened.RequesterID)
+	})
+
+	t.Run("should record who performed the change alongside each event", func(t *testing.T) {
+		id := valueobjects.NewID(uuid.New())
+		title, err := valueobjects.NewTitle("Valid Title")
+		require.NoError(t, err)
+		description, err := valueobjects.NewDescription("Valid Description")
+		require.NoError(t, err)
+		opened := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil, "user-1")
+
+		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0, "user-1"))
+		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{event.NewTicketClosed(id, "Resolvido")}, 1, "agent-1"))
+
+		rows, err := pool.Query(context.Background(),
+			`SELECT actor_id FROM ticket_events WHERE aggregate_id = $1 ORDER BY version`, id.GetID())
+		require.NoError(t, err)
+		defer rows.Close()
+		var actors []string
+		for rows.Next() {
+			var actorID string
+			require.NoError(t, rows.Scan(&actorID))
+			actors = append(actors, actorID)
+		}
+		assert.Equal(t, []string{"user-1", "agent-1"}, actors)
 	})
 
 	t.Run("should append multiple events across separate calls in order", func(t *testing.T) {
@@ -66,13 +91,13 @@ func TestEventStore(t *testing.T) {
 		description, err := valueobjects.NewDescription("Valid Description")
 		require.NoError(t, err)
 
-		opened := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil)
-		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0))
+		opened := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil, "user-1")
+		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0, "user-1"))
 
 		assignee, err := valueobjects.NewAssigneeID("agent-1")
 		require.NoError(t, err)
 		assigned := event.NewTicketAssigned(id, &assignee)
-		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{assigned}, 1))
+		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{assigned}, 1, "user-1"))
 
 		loaded, err := store.Load(context.Background(), id.GetID())
 		assert.NoError(t, err)
@@ -88,10 +113,10 @@ func TestEventStore(t *testing.T) {
 		description, err := valueobjects.NewDescription("Valid Description")
 		require.NoError(t, err)
 
-		opened := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil)
-		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0))
+		opened := event.NewTicketOpened(id, title, description, valueobjects.TicketStatusOpen, nil, nil, "user-1")
+		require.NoError(t, store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0, "user-1"))
 
-		err = store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0)
+		err = store.Append(context.Background(), id.GetID(), []event.Event{opened}, 0, "user-1")
 		assert.ErrorIs(t, err, domainErr.ErrConcurrencyConflict)
 	})
 
@@ -107,12 +132,12 @@ func TestEventStore(t *testing.T) {
 		require.NoError(t, err)
 
 		id1 := valueobjects.NewID(uuid.New())
-		opened1 := event.NewTicketOpened(id1, title, description, valueobjects.TicketStatusOpen, nil, nil)
-		require.NoError(t, store.Append(context.Background(), id1.GetID(), []event.Event{opened1}, 0))
+		opened1 := event.NewTicketOpened(id1, title, description, valueobjects.TicketStatusOpen, nil, nil, "user-1")
+		require.NoError(t, store.Append(context.Background(), id1.GetID(), []event.Event{opened1}, 0, "user-1"))
 
 		id2 := valueobjects.NewID(uuid.New())
-		opened2 := event.NewTicketOpened(id2, title, description, valueobjects.TicketStatusOpen, nil, nil)
-		require.NoError(t, store.Append(context.Background(), id2.GetID(), []event.Event{opened2}, 0))
+		opened2 := event.NewTicketOpened(id2, title, description, valueobjects.TicketStatusOpen, nil, nil, "user-1")
+		require.NoError(t, store.Append(context.Background(), id2.GetID(), []event.Event{opened2}, 0, "user-1"))
 
 		ids, err := store.ListAggregateIDs(context.Background())
 		assert.NoError(t, err)

@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/application/port/out"
+	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/actor"
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
 	"github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/ticket"
 )
@@ -19,11 +20,18 @@ func NewEventSourcedUseCase(store out.EventStore, cache out.TicketCache) EventSo
 	return EventSourcedUseCase{store: store, cache: cache}
 }
 
-func (uc EventSourcedUseCase) CreateTicket(ctx context.Context, t *ticket.Ticket) error {
-	return uc.commit(ctx, t, t.GetID().GetID(), 0)
+func (uc EventSourcedUseCase) CreateTicket(ctx context.Context, by actor.Actor, t *ticket.Ticket) error {
+	if err := requireActor(by); err != nil {
+		return err
+	}
+	return uc.commit(ctx, by, t, t.GetID().GetID(), 0)
 }
 
-func (uc EventSourcedUseCase) UpdateTicket(ctx context.Context, rawTicketID string, change func(t *ticket.Ticket) error) error {
+func (uc EventSourcedUseCase) UpdateTicket(ctx context.Context, by actor.Actor, rawTicketID string, allowed ticket.Permission, change func(t *ticket.Ticket) error) error {
+	if err := requireActor(by); err != nil {
+		return err
+	}
+
 	ticketID, err := parseTicketID(rawTicketID)
 	if err != nil {
 		return err
@@ -33,12 +41,15 @@ func (uc EventSourcedUseCase) UpdateTicket(ctx context.Context, rawTicketID stri
 	if err != nil {
 		return err
 	}
+	if err := authorize(t, by, allowed); err != nil {
+		return err
+	}
 
 	if err := change(t); err != nil {
 		return err
 	}
 
-	return uc.commit(ctx, t, ticketID, version)
+	return uc.commit(ctx, by, t, ticketID, version)
 }
 
 func (uc EventSourcedUseCase) loadTicket(ctx context.Context, ticketID uuid.UUID) (*ticket.Ticket, int, error) {
@@ -92,8 +103,8 @@ func (uc EventSourcedUseCase) LoadAllTickets(ctx context.Context) ([]*ticket.Tic
 	return tickets, nil
 }
 
-func (uc EventSourcedUseCase) commit(ctx context.Context, t *ticket.Ticket, ticketID uuid.UUID, expectedVersion int) error {
-	if err := uc.store.Append(ctx, ticketID, t.GetUncommittedEvents(), expectedVersion); err != nil {
+func (uc EventSourcedUseCase) commit(ctx context.Context, by actor.Actor, t *ticket.Ticket, ticketID uuid.UUID, expectedVersion int) error {
+	if err := uc.store.Append(ctx, ticketID, t.GetUncommittedEvents(), expectedVersion, by.ID()); err != nil {
 		return err
 	}
 	t.ClearUncommittedEvents()
@@ -107,4 +118,21 @@ func parseTicketID(raw string) (uuid.UUID, error) {
 		return uuid.Nil, domainErr.ErrInvalidUUID
 	}
 	return id, nil
+}
+
+func requireActor(by actor.Actor) error {
+	if by.ID() == "" {
+		return domainErr.ErrInvalidActor
+	}
+	return nil
+}
+
+func authorize(t *ticket.Ticket, by actor.Actor, allowed ticket.Permission) error {
+	if !t.IsVisibleTo(by) {
+		return domainErr.ErrEventStreamNotFound
+	}
+	if !allowed(t, by) {
+		return domainErr.ErrForbidden
+	}
+	return nil
 }

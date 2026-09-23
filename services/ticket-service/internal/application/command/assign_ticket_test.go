@@ -18,6 +18,7 @@ func openTestTicket(t *testing.T, store *outtest.EventStore) string {
 	t.Helper()
 
 	output, err := command.NewOpenTicketUseCase(store, newTestCache()).Execute(context.Background(), command.OpenTicketInput{
+		Actor:       testUser,
 		Title:       "Valid Title",
 		Description: "Valid Description",
 	})
@@ -33,6 +34,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 		uc := command.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AssignTicketInput{
+			Actor:      testAdmin,
 			TicketID:   ticketID,
 			AssigneeID: "agent-1",
 		})
@@ -48,6 +50,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 		uc := command.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AssignTicketInput{
+			Actor:      testAdmin,
 			TicketID:   "not-a-uuid",
 			AssigneeID: "agent-1",
 		})
@@ -60,6 +63,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 		uc := command.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AssignTicketInput{
+			Actor:      testAdmin,
 			TicketID:   "00000000-0000-0000-0000-000000000001",
 			AssigneeID: "agent-1",
 		})
@@ -73,6 +77,7 @@ func TestAssignTicketUseCase(t *testing.T) {
 		uc := command.NewAssignTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.AssignTicketInput{
+			Actor:      testAdmin,
 			TicketID:   ticketID,
 			AssigneeID: "",
 		})

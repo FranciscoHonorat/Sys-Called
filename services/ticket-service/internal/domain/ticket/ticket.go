@@ -1,6 +1,7 @@
 package ticket
 
 import (
+	"strings"
 	"time"
 
 	domainErr "github.com/franciscoHonorat/Sys-Called/services/ticket-service/internal/domain/domain-errors"
@@ -18,12 +19,15 @@ type Ticket struct {
 	assigneeID  *valueobjects.AssigneeID
 	priority    *valueobjects.Priority
 	createdAt   time.Time
+	requesterID string
+	closedAt    *time.Time
+	resolution  string
 	responses   []*response.Response
 
 	uncommittedEvents []event.Event
 }
 
-func NewTicket(id *valueobjects.ID, title *valueobjects.Title, description *valueobjects.Description, status valueobjects.Status, assigneeID *valueobjects.AssigneeID, priority *valueobjects.Priority) (*Ticket, error) {
+func NewTicket(id *valueobjects.ID, title *valueobjects.Title, description *valueobjects.Description, status valueobjects.Status, assigneeID *valueobjects.AssigneeID, priority *valueobjects.Priority, requesterID string) (*Ticket, error) {
 	if id == nil {
 		return nil, domainErr.ErrInvalidID
 	}
@@ -36,6 +40,9 @@ func NewTicket(id *valueobjects.ID, title *valueobjects.Title, description *valu
 	if !status.IsValid() {
 		return nil, domainErr.ErrInvalidStatus
 	}
+	if requesterID == "" {
+		return nil, domainErr.ErrInvalidRequester
+	}
 
 	t := &Ticket{
 		id:          id,
@@ -45,8 +52,9 @@ func NewTicket(id *valueobjects.ID, title *valueobjects.Title, description *valu
 		assigneeID:  assigneeID,
 		priority:    priority,
 		createdAt:   time.Now(),
+		requesterID: requesterID,
 	}
-	t.raise(event.NewTicketOpened(id, title, description, status, assigneeID, priority))
+	t.raise(event.NewTicketOpened(id, title, description, status, assigneeID, priority, requesterID))
 
 	return t, nil
 }
@@ -93,6 +101,18 @@ func (t *Ticket) GetPriority() *valueobjects.Priority {
 	return t.priority
 }
 
+func (t *Ticket) GetRequesterID() string {
+	return t.requesterID
+}
+
+func (t *Ticket) GetResolution() string {
+	return t.resolution
+}
+
+func (t *Ticket) GetClosedAt() *time.Time {
+	return t.closedAt
+}
+
 func (t *Ticket) GetCreatedAt() time.Time {
 	return t.createdAt
 }
@@ -134,6 +154,7 @@ func (t *Ticket) apply(e event.Event) error {
 		t.description = description
 		t.status = status
 		t.createdAt = ev.OccurredAt()
+		t.requesterID = ev.RequesterID
 
 		if ev.AssigneeID != "" {
 			assigneeID, err := valueobjects.NewAssigneeID(ev.AssigneeID)
@@ -181,6 +202,9 @@ func (t *Ticket) apply(e event.Event) error {
 
 	case event.TicketClosed:
 		t.status = valueobjects.TicketStatusClosed
+		closedAt := ev.OccurredAt()
+		t.closedAt = &closedAt
+		t.resolution = ev.Resolution
 
 	case event.TicketResponseAdded:
 		responseID, err := uuid.Parse(ev.ResponseID)
@@ -269,11 +293,18 @@ func (t *Ticket) MoveToInProgress() error {
 	return nil
 }
 
-func (t *Ticket) Close() error {
+func (t *Ticket) Close(resolution string) error {
 	if t.status == valueobjects.TicketStatusClosed {
 		return domainErr.ErrTicketAlreadyClosed
 	}
-	t.status = valueobjects.TicketStatusClosed
-	t.raise(event.NewTicketClosed(t.id))
+	resolution = strings.TrimSpace(resolution)
+	if resolution == "" {
+		return domainErr.ErrInvalidResolution
+	}
+	closed := event.NewTicketClosed(t.id, resolution)
+	if err := t.apply(closed); err != nil {
+		return err
+	}
+	t.raise(closed)
 	return nil
 }

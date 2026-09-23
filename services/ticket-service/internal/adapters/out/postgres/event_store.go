@@ -24,7 +24,7 @@ func NewEventStore(pool *pgxpool.Pool) *EventStore {
 	return &EventStore{pool: pool}
 }
 
-func (s *EventStore) Append(ctx context.Context, aggregateID uuid.UUID, events []event.Event, expectedVersion int) error {
+func (s *EventStore) Append(ctx context.Context, aggregateID uuid.UUID, events []event.Event, expectedVersion int, actorID string) error {
 	if len(events) == 0 {
 		return nil
 	}
@@ -51,8 +51,8 @@ func (s *EventStore) Append(ctx context.Context, aggregateID uuid.UUID, events [
 		}
 
 		_, err = tx.Exec(ctx,
-			`INSERT INTO ticket_events (id, aggregate_id, version, event_type, payload, occurred_at) VALUES ($1, $2, $3, $4, $5, $6)`,
-			uuid.New(), aggregateID, expectedVersion+i+1, e.EventName(), payload, e.OccurredAt(),
+			`INSERT INTO ticket_events (id, aggregate_id, version, event_type, payload, occurred_at, actor_id) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			uuid.New(), aggregateID, expectedVersion+i+1, e.EventName(), payload, e.OccurredAt(), actorID,
 		)
 		if err != nil {
 			var pgErr *pgconn.PgError

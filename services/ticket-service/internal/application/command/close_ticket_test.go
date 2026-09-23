@@ -15,11 +15,13 @@ import (
 func TestCloseTicketUseCase(t *testing.T) {
 	t.Run("should close an existing ticket", func(t *testing.T) {
 		store := outtest.NewEventStore()
-		ticketID := openTestTicket(t, store)
+		ticketID := openAssignedTicket(t, store)
 		uc := command.NewCloseTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.CloseTicketInput{
-			TicketID: ticketID,
+			Resolution: "Resolvido",
+			Actor:      assignedAgent,
+			TicketID:   ticketID,
 		})
 
 		assert.NoError(t, err)
@@ -33,7 +35,9 @@ func TestCloseTicketUseCase(t *testing.T) {
 		uc := command.NewCloseTicketUseCase(store, newTestCache())
 
 		err := uc.Execute(context.Background(), command.CloseTicketInput{
-			TicketID: "00000000-0000-0000-0000-000000000001",
+			Resolution: "Resolvido",
+			Actor:      assignedAgent,
+			TicketID:   "00000000-0000-0000-0000-000000000001",
 		})
 
 		assert.ErrorIs(t, err, domainErr.ErrEventStreamNotFound)
@@ -41,11 +45,11 @@ func TestCloseTicketUseCase(t *testing.T) {
 
 	t.Run("should return an error when the ticket is already closed", func(t *testing.T) {
 		store := outtest.NewEventStore()
-		ticketID := openTestTicket(t, store)
+		ticketID := openAssignedTicket(t, store)
 		uc := command.NewCloseTicketUseCase(store, newTestCache())
-		assert.NoError(t, uc.Execute(context.Background(), command.CloseTicketInput{TicketID: ticketID}))
+		assert.NoError(t, uc.Execute(context.Background(), command.CloseTicketInput{Resolution: "Resolvido", Actor: assignedAgent, TicketID: ticketID}))
 
-		err := uc.Execute(context.Background(), command.CloseTicketInput{TicketID: ticketID})
+		err := uc.Execute(context.Background(), command.CloseTicketInput{Resolution: "Resolvido", Actor: assignedAgent, TicketID: ticketID})
 
 		assert.ErrorIs(t, err, domainErr.ErrTicketAlreadyClosed)
 	})

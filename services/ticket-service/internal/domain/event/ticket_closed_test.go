@@ -16,7 +16,7 @@ func TestTicketClosed(t *testing.T) {
 	t.Run("should carry the aggregate ID", func(t *testing.T) {
 		id := valueobjects.NewID(uuid.New())
 
-		e := event.NewTicketClosed(id)
+		e := event.NewTicketClosed(id, "Resolvido")
 
 		assert.Equal(t, "TicketClosed", e.EventName())
 		assert.Equal(t, id.GetID(), e.AggregateID())
