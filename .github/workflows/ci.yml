@@ -44,12 +44,42 @@ jobs:
       - name: Test
         run: go test ./... -race
 
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Type-check and build
+        run: npm run build
+
   docker:
     name: docker build (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ticket-service, employees-service]
+        include:
+          - service: ticket-service
+            context: services/ticket-service
+          - service: employees-service
+            context: services/employees-service
+          - service: frontend
+            context: frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -57,7 +87,7 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: services/${{ matrix.service }}
+          context: ${{ matrix.context }}
           push: false
           tags: sys-called-${{ matrix.service }}:ci
           cache-from: type=gha,scope=${{ matrix.service }}
@@ -66,17 +96,20 @@ jobs:
   compose-smoke:
     name: docker compose smoke test
     runs-on: ubuntu-latest
-    needs: [go, docker]
+    needs: [go, frontend, docker]
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create .env
+        run: make env
+
       - name: Start the stack
-        run: docker compose up --build -d
+        run: docker compose up --build -d --wait
 
       - name: Wait for services to be healthy
         run: |
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:18080/healthz >/dev/null && curl -sf http://localhost:18081/healthz >/dev/null; then
+            if curl -sf http://localhost:18080/healthz >/dev/null && curl -sf http://localhost:18081/healthz >/dev/null && curl -sf http://localhost:8000/ >/dev/null; then
               echo "services are up"
               exit 0
             fi
@@ -100,22 +133,43 @@ jobs:
           echo "responsibles were not synced in time"
           exit 1
 
-      - name: Smoke test ticket lifecycle and automatic assignment
+      - name: Smoke test authentication, ticket lifecycle and automatic assignment
         run: |
           set -euo pipefail
 
-          ticket=$(curl -sf -X POST http://localhost:18080/tickets \
+          unauthenticated=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:18080/tickets)
+          test "$unauthenticated" = "401"
+
+          login=$(curl -sf -X POST http://localhost:18081/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"admin","password":"senha123"}')
+          token=$(echo "$login" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+          auth=(-H "Authorization: Bearer $token")
+
+          ticket=$(curl -sf "${auth[@]}" -X POST http://localhost:18080/tickets \
             -H "Content-Type: application/json" \
             -d '{"title":"CI smoke ticket","description":"Created by CI"}')
           echo "$ticket"
           id=$(echo "$ticket" | grep -o '"ticket_id":"[^"]*"' | cut -d'"' -f4)
 
-          assign=$(curl -sf -X POST "http://localhost:18080/tickets/$id/assign/auto")
+          assign=$(curl -sf "${auth[@]}" -X POST "http://localhost:18080/tickets/$id/assign/auto")
           echo "$assign"
           echo "$assign" | grep -q '"assignee_id"'
 
-          list=$(curl -sf http://localhost:18080/tickets)
+          list=$(curl -sf "${auth[@]}" http://localhost:18080/tickets)
           echo "$list" | grep -q "$id"
+
+      - name: Smoke test the frontend and its API proxy
+        run: |
+          set -euo pipefail
+
+          curl -sf http://localhost:8000/chamados | grep -q '<div id="app">'
+
+          headers=$(mktemp)
+          curl -sf -D "$headers" -o /dev/null -X POST http://localhost:8000/api/employees/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"usuario","password":"senha123"}'
+          grep -qi '^set-cookie: refresh_token=.*Path=/api/employees/auth' "$headers"
 
       - name: Show logs on failure
         if: failure()
@@ -124,3 +178,70 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
+
+  helm:
+    name: helm chart and scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - name: Lint the chart
+        run: helm lint infra/helm/sys-called
+
+      - name: Render the chart
+        run: helm template sys-called infra/helm/sys-called > /dev/null
+
+      - name: Shellcheck
+        run: shellcheck infra/scripts/*.sh
+
+  k8s-smoke:
+    name: kubernetes smoke test (kind + helm)
+    runs-on: ubuntu-latest
+    needs: [helm, docker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: sys-called
+          config: infra/kind/cluster.yaml
+
+      - name: Build the images and install the chart
+        run: ./infra/scripts/k8s.sh up
+
+      - name: Smoke test through the frontend proxy
+        run: |
+          set -euo pipefail
+          url=http://localhost:30080
+
+          for i in $(seq 1 30); do
+            count=$(kubectl -n sys-called exec ticket-postgres-0 -- psql -U ticket_service -d ticket_service -tAc "SELECT count(*) FROM responsibles;" || echo 0)
+            if [ "$count" -ge 3 ]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$count" -ge 3
+
+          token=$(curl -sf -X POST "$url/api/employees/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{"username":"admin","password":"senha123"}' | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+          auth=(-H "Authorization: Bearer $token")
+
+          id=$(curl -sf "${auth[@]}" -X POST "$url/api/tickets/tickets" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"k8s smoke ticket","description":"Created by CI on kind"}' | grep -o '"ticket_id":"[^"]*"' | cut -d'"' -f4)
+
+          curl -sf "${auth[@]}" -X POST "$url/api/tickets/tickets/$id/assign/auto" | grep -q '"assignee_id"'
+          curl -sf "${auth[@]}" "$url/api/tickets/tickets" | grep -q "$id"
+
+      - name: Show cluster state on failure
+        if: failure()
+        run: |
+          kubectl -n sys-called get pods -o wide
+          kubectl -n sys-called describe pods
+          kubectl -n sys-called logs --all-containers --prefix -l app.kubernetes.io/part-of=sys-called --tail=100

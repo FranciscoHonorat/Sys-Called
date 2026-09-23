@@ -1,0 +1,11 @@
+Sys-Called instalado no namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+Acesse: http://{{ .Values.ingress.host }}
+{{- else if eq .Values.frontend.service.type "NodePort" }}
+Acesse pela porta {{ .Values.frontend.service.nodePort }} de qualquer nó (no kind do projeto: http://localhost:{{ .Values.frontend.service.nodePort }}).
+{{- else }}
+Acesse com: kubectl -n {{ .Release.Namespace }} port-forward svc/frontend 8080:{{ .Values.frontend.service.port }}
+{{- end }}
+
+Estado dos pods: kubectl -n {{ .Release.Namespace }} get pods
